@@ -94,7 +94,7 @@ folds at 5 / 15 / 25 V, rounded peaks, 2x oversampled).
   without .git / build into the Windows clone (the user's release folder's `github/`) and committing there with the
   Windows git (author wootr0p, the GitHub noreply email: never the user's own email). The hub release: a tag vX.Y and
   `fmav1-X.Y.fwsc` on its GitHub release, made after the user's tests on the device.
-- Publishing on The Firmware Hub: `fmhub.json` (what, kind, image `docs/card.png`, color, sounds), `DISCLAIMER.md`,
+- Publishing on The Firmware Hub: `fmhub.json` (what, author, kinds [a list], image `docs/card.png`, color, sounds), `DISCLAIMER.md`,
   `CHANGELOG.md`; the hub wants the source in a public GitHub repo at a tag and the `.fwsc` on its release, tested on a
   real FM-1 from V15 and from another firmware.
 
