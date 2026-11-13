@@ -1,0 +1,37 @@
+# the screens for the manual and the hub's card (0.3): the boot (1000); NOISE HIT (34: seven cables) on the whole
+# patchbay; DUO LEAD (16) held: PERFORM, VCO, VCF, EG, the LFO synced, the CLOCK page, the delay, UTL's folder, an
+# INPUTS page of SEQ; CLOCK MELODY (64) on the patchbay. buttons: 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 8 HOME 11 SEQ;
+# encoders: 0 SELECT 2-5 KNOB 1-4 6 PRESETS
+1500 midi 0xC0 33 0
+1600 midi 0x90 60 100
+1700 btn 11
+1900 shot
+2000 midi 0x80 60 0
+2100 midi 0xC0 15 0
+2200 midi 0x90 60 100
+2300 btn 8
+2500 shot
+2600 btn 6
+2800 shot
+2900 enc 0 3
+3100 shot
+3200 btn 4
+3400 shot
+3500 btn 5
+3600 enc 5 12
+3800 shot
+3900 enc 0 2
+4100 shot
+4200 btn 2
+4300 enc 0 2
+4500 shot
+4600 btn 3
+4800 shot
+4900 btn 11
+5000 enc 0 1
+5200 shot
+5300 midi 0x80 60 0
+5400 midi 0xC0 63 0
+5500 enc 0 -1
+5900 shot
+6400 end

@@ -1,0 +1,77 @@
+# every section, every page (SELECT turned; SELECT pressed: UTL), a note held so the live graphs show it
+# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SAVE 10 ARP 11 SEQ 12 PLAY 13 REC
+# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS
+1500 midi 0xC0 0 0
+1600 midi 0x90 48 100
+1800 btn 8
+2000 shot
+2100 enc 0 1
+2300 shot
+2400 enc 0 1
+2600 shot
+2700 enc 0 1
+2900 shot
+3000 enc 0 1
+3200 shot
+3300 btn 6
+3500 shot
+3600 enc 0 1
+3800 shot
+3900 enc 0 1
+4100 shot
+4200 enc 0 1
+4400 shot
+4500 enc 0 1
+4700 shot
+4800 btn 4
+5000 shot
+5100 enc 0 1
+5300 shot
+5400 enc 0 1
+5600 shot
+5700 btn 5
+5900 shot
+6000 enc 0 1
+6200 shot
+6300 enc 0 1
+6500 shot
+6600 btn 2
+6800 shot
+6900 enc 0 1
+7100 shot
+7200 enc 0 1
+7400 shot
+7500 enc 0 1
+7700 shot
+7800 enc 0 1
+8000 shot
+8100 enc 0 1
+8300 shot
+8400 enc 0 1
+8600 shot
+8700 btn 11
+8900 shot
+9000 enc 0 1
+9200 shot
+9300 enc 0 1
+9500 shot
+9600 enc 0 1
+9800 shot
+9900 btn 3
+10100 shot
+10200 enc 0 1
+10400 shot
+10500 enc 0 1
+10700 shot
+10800 btn 10
+11000 shot
+11100 btn 7
+11300 shot
+11400 enc 0 1
+11600 shot
+11700 enc 0 1
+11900 shot
+12000 enc 0 1
+12200 shot
+12300 midi 0x80 48 0
+12800 end

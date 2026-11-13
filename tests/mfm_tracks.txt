@@ -1,0 +1,40 @@
+# four tracks (MFM_NTRK=4: tests/run_host.sh with MFM_NTRK=4): MIDI channel 1 (CC 3 = 1), so channels 1-4 play tracks
+# 1-4 whatever track the panel is on; each a program (bass, lead, S+H, kick) and a pattern; ALGORITHM steps the
+# panel's track (its colour on the number), HOME twice = the MIXER (the levels as they play), a level and a pan turned.
+# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SAVE 10 ARP 11 SEQ 12 PLAY 13 REC
+# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS
+1500 midi 0xB0 3 1
+1550 midi 0xC0 0 0
+1560 midi 0xC1 10 0
+1570 midi 0xC2 20 0
+1580 midi 0xC3 30 0
+1700 midi 0x90 36 110
+1700 midi 0x91 72 100
+1700 midi 0x92 60 100
+1700 midi 0x93 48 127
+1900 midi 0x80 36 0
+1900 midi 0x83 48 0
+2000 midi 0x90 43 110
+2100 midi 0x93 48 127
+2200 midi 0x80 43 0
+2250 midi 0x83 48 0
+2300 shot
+2400 enc 1 1
+2600 shot
+2700 enc 1 1
+2900 shot
+3000 enc 1 1
+3200 shot
+3300 btn 8
+3500 midi 0x90 36 110
+3600 midi 0x93 48 127
+3700 shot
+3800 enc 3 -20
+3900 enc 0 0
+4000 enc 3 -30
+4200 shot
+4300 midi 0x80 36 0
+4300 midi 0x81 72 0
+4300 midi 0x82 60 0
+4300 midi 0x83 48 0
+5000 end

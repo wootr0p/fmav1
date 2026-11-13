@@ -1,0 +1,184 @@
+# the panel's actions (0.3: tools/gen_ui_tests.py)
+# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SAVE 10 ARP 11 SEQ 12 PLAY 13 REC
+# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS
+1500 midi 0xC0 15 0
+1600 midi 0x90 60 100
+1800 btn 4
+1900 enc 0 2
+2000 enc 3 1
+2200 shot
+2300 enc 3 -1
+2400 btn 6
+2500 enc 3 30
+2700 shot
+2800 enc 0 4
+2900 enc 2 2
+3100 shot
+3200 btn 2
+3300 enc 2 1
+3500 shot
+3600 enc 0 2
+3700 enc 2 1
+3800 enc 3 -20
+4000 shot
+4100 btn 13
+4300 shot
+4400 btn 13
+4600 shot
+4700 btn 11
+4900 shot
+5000 enc 0 1
+5100 enc 2 3
+5200 enc 3 1
+5400 shot
+5500 enc 0 -1
+5700 shot
+5800 btn 3
+5900 enc 2 40
+6100 shot
+6200 btn 3
+6400 shot
+6500 btndown 6
+6550 btn 0
+6600 btnup 6
+6800 shot
+6900 btn 5
+7000 enc 5 12
+7200 shot
+7300 enc 0 2
+7500 shot
+7600 btn 10
+7700 midi 0xFA 0 0
+7720 midi 0xF8 0 0
+7740 midi 0xF8 0 0
+7760 midi 0xF8 0 0
+7780 midi 0xF8 0 0
+7800 midi 0xF8 0 0
+7820 midi 0xF8 0 0
+7840 midi 0xF8 0 0
+7860 midi 0xF8 0 0
+7880 midi 0xF8 0 0
+7900 midi 0xF8 0 0
+7920 midi 0xF8 0 0
+7940 midi 0xF8 0 0
+7960 midi 0xF8 0 0
+7980 midi 0xF8 0 0
+8000 midi 0xF8 0 0
+8020 midi 0xF8 0 0
+8040 midi 0xF8 0 0
+8060 midi 0xF8 0 0
+8080 midi 0xF8 0 0
+8100 midi 0xF8 0 0
+8120 midi 0xF8 0 0
+8140 midi 0xF8 0 0
+8160 midi 0xF8 0 0
+8180 midi 0xF8 0 0
+8200 midi 0xF8 0 0
+8220 midi 0xF8 0 0
+8240 midi 0xF8 0 0
+8260 midi 0xF8 0 0
+8280 midi 0xF8 0 0
+8300 midi 0xF8 0 0
+8320 midi 0xF8 0 0
+8340 midi 0xF8 0 0
+8360 midi 0xF8 0 0
+8380 midi 0xF8 0 0
+8400 midi 0xF8 0 0
+8400 shot
+8420 midi 0xF8 0 0
+8440 midi 0xF8 0 0
+8460 midi 0xF8 0 0
+8480 midi 0xF8 0 0
+8500 midi 0xF8 0 0
+8520 midi 0xF8 0 0
+8540 midi 0xF8 0 0
+8560 midi 0xF8 0 0
+8580 midi 0xF8 0 0
+8600 midi 0xF8 0 0
+8620 midi 0xF8 0 0
+8640 midi 0xF8 0 0
+8660 midi 0xF8 0 0
+8680 midi 0xF8 0 0
+8700 midi 0xF8 0 0
+8720 midi 0xF8 0 0
+8740 midi 0xF8 0 0
+8760 midi 0xF8 0 0
+8780 midi 0xF8 0 0
+8800 midi 0xF8 0 0
+8820 midi 0xF8 0 0
+8840 midi 0xF8 0 0
+8860 midi 0xF8 0 0
+8880 midi 0xF8 0 0
+8900 midi 0xF8 0 0
+8920 midi 0xF8 0 0
+8940 midi 0xF8 0 0
+8960 midi 0xF8 0 0
+8980 midi 0xF8 0 0
+9000 midi 0xF8 0 0
+9000 btn 5
+9020 midi 0xF8 0 0
+9040 midi 0xF8 0 0
+9060 midi 0xF8 0 0
+9080 midi 0xF8 0 0
+9100 midi 0xF8 0 0
+9100 shot
+9120 midi 0xF8 0 0
+9140 midi 0xF8 0 0
+9160 midi 0xF8 0 0
+9180 midi 0xF8 0 0
+9200 midi 0xF8 0 0
+9220 midi 0xF8 0 0
+9240 midi 0xF8 0 0
+9260 midi 0xF8 0 0
+9280 midi 0xF8 0 0
+9300 midi 0xF8 0 0
+9320 midi 0xF8 0 0
+9340 midi 0xF8 0 0
+9360 midi 0xF8 0 0
+9380 midi 0xF8 0 0
+9400 midi 0xF8 0 0
+9420 midi 0xF8 0 0
+9440 midi 0xF8 0 0
+9460 midi 0xF8 0 0
+9480 midi 0xF8 0 0
+9500 midi 0xF8 0 0
+9520 midi 0xF8 0 0
+9540 midi 0xF8 0 0
+9560 midi 0xF8 0 0
+9580 midi 0xF8 0 0
+9600 midi 0xF8 0 0
+9620 midi 0xF8 0 0
+9640 midi 0xF8 0 0
+9660 midi 0xF8 0 0
+9680 midi 0xF8 0 0
+9750 midi 0xFC 0 0
+9800 midi 0x80 60 0
+9900 btn 10
+10100 shot
+10200 btndown 9
+10300 keys 0x4
+10400 keys 0
+10500 btnup 9
+10700 shot
+10800 keys 0x80
+11300 keys 0
+11400 btn 9
+11500 enc 6 5
+11600 btn 9
+11800 shot
+12700 enc 6 1
+12900 shot
+13000 enc 1 1
+13200 shot
+13300 enc 1 -1
+13400 btn 1
+13500 btn 1
+13700 shot
+13800 btn 0
+13900 btn 0
+14000 btn 12
+14100 keys 0x91
+14400 keys 0
+14600 shot
+14700 btn 12
+15200 end
