@@ -90,6 +90,10 @@ folds at 5 / 15 / 25 V, rounded peaks, 2x oversampled).
   NRPN on the host.
 - Storage: settings in the globals sector 0xFC000 (SET_MAGIC "MFM1"; 0.3 appended `fx_off`: a 0.2 save, shorter, still
   loads), the 99 programs in 3 sectors at **0xD8000** (40 a sector, tag "MFM3").
+- GitHub: <https://github.com/wootr0p/fmav1> (public, branch main). Work here in WSL; publish by copying the tree
+  without .git / build into the Windows clone (the user's release folder's `github/`) and committing there with the
+  Windows git (author wootr0p, the GitHub noreply email: never the user's own email). The hub release: a tag vX.Y and
+  `fmav1-X.Y.fwsc` on its GitHub release, made after the user's tests on the device.
 - Publishing on The Firmware Hub: `fmhub.json` (what, kind, image `docs/card.png`, color, sounds), `DISCLAIMER.md`,
   `CHANGELOG.md`; the hub wants the source in a public GitHub repo at a tag and the `.fwsc` on its release, tested on a
   real FM-1 from V15 and from another firmware.
