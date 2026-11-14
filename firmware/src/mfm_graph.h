@@ -458,7 +458,10 @@ static void g_clk(const uint8_t *pv, uint16_t c)
     s[0] = 0; scat(s, DIV_NAME[pv[P_CLK_DIV] % NCLKDIV]); scat(s, "  GATE "); fmt_u(s + slen(s), wd * 100u / 128u); scat(s, "%");
     g_label(GX0 + 2, GY0, s, c);
     s[0] = 0;
-    if (ctl_ext_quarter) { scat(s, ctl_clk_run ? "MIDI " : "MIDI STOP "); fmt_u(s + slen(s), (FS * 60u + quarter_len() / 2u) / quarter_len()); }
+    if (set.clk_src != CLK_INT) {               /* (0.4.1) the outside clock's: its tempo, --- until measured */
+        scat(s, CLK_NAME[set.clk_src % 3u]); scat(s, ctl_clk_run ? " " : " STOP ");
+        if (ctl_ext_quarter) fmt_u(s + slen(s), clk_bpm()); else scat(s, "---");
+    }
     else { scat(s, "TEMPO "); fmt_u(s + slen(s), ctl_tempo); }
     g_label_r(s, c);
     g_end();

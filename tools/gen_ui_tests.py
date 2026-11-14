@@ -24,7 +24,8 @@ Path("tests/mfm_nav.txt").write_text("\n".join(L) + "\n")
 
 # ---- the panel's actions (0.3): no switch on SELECT; knobs for VCA MODE and the effects' ON; REC (every effect off /
 # on); SELECT pressed (UTL); a jack's choices (DUMMY one detent after "---"); LFO SYNC and the CLOCK page under a MIDI
-# clock (Start, 24 a quarter, Stop); the arp on that clock; undo; SAVE + G3 (a random sound); SAVE twice; PRESETS;
+# clock (Start, 24 a quarter, Stop; 0.4.1: GLOBAL > CLOCK = TRS, a faster USB clock and a USB Stop ignored, TEMPO locked
+# showing the TRS tempo); the arp on that clock; undo; SAVE + G3 (a random sound); SAVE twice; PRESETS;
 # ALGORITHM; OCT+ twice (its LED blinking) and back; PLAY (HOLD)
 A = [
     (1500, "midi 0xC0 15 0"), (1600, "midi 0x90 60 100"),
@@ -40,14 +41,15 @@ A = [
     (6500, "btndown 6"), (6550, "btn 0"), (6600, "btnup 6"), (6800, "shot"),                     # EDIT + OCT-: undo
     (6900, "btn 5"), (7000, "enc 4 12"), (7200, "shot"),                                         # LFO SYNC 1/8
     (7300, "enc 0 1"), (7500, "shot"),                                                           # CLOCK
-    (7600, "btn 10"),                                                                            # the arp on
-    (7700, "midi 0xFA 0 0"),
+    (7520, "btn 7"), (7540, "enc 0 2"), (7560, "enc 4 2"), (7600, "enc 5 10"), (7610, "shot"),   # CLOCK TRS, TEMPO locked
+    (7630, "btn 5"), (7650, "btn 10"), (7670, "btn 10"),                                         # the arp on (ARP twice)
+    (7700, "trs 0xFA 0 0"), (8000, "midi 0xFC 0 0"),                                             # (USB: ignored)
 ]
 t = 7720
-while t < 9700:                                                                                  # a MIDI clock, 125 bpm
-    A.append((t, "midi 0xF8 0 0")); t += 20
-A += [(8400, "shot"), (9000, "btn 5"), (9100, "shot"), (9750, "midi 0xFC 0 0"), (9800, "midi 0x80 60 0"),
-      (9900, "btn 10"), (10100, "shot"),
+while t < 9700:                                                                                  # a TRS clock, 125 bpm
+    A.append((t, "trs 0xF8 0 0")); A.append((t + 7, "midi 0xF8 0 0")); A.append((t + 13, "midi 0xF8 0 0")); t += 20
+A += [(8400, "shot"), (9000, "btn 5"), (9100, "shot"), (9690, "shot"), (9700, "btn 7"), (9745, "shot"),   # GLOBAL: TRS 125
+      (9750, "trs 0xFC 0 0"), (9800, "midi 0x80 60 0"), (9900, "btn 10"), (9950, "btn 10"), (10100, "shot"),   # arp off
       (10200, "btndown 9"), (10300, "keys 0x4"), (10400, "keys 0"), (10500, "btnup 9"), (10700, "shot"),   # random
       (10800, "keys 0x80"), (11300, "keys 0"), (11400, "btn 9"), (11500, "enc 6 5"), (11600, "btn 9"),     # save
       (11800, "shot"), (12700, "enc 6 1"), (12900, "shot"), (13000, "enc 1 1"), (13200, "shot"), (13300, "enc 1 -1"),

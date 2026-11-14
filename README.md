@@ -9,9 +9,9 @@ every cable running a sample at a time (the LFO, the S+H and the VCO patch into 
 and the folder at audio rate).
 
 - **Four monophonic tracks**, each its own sound, on MIDI channels N .. N+3 (fixed; ALGORITHM picks the panel's).
-- **The MIDI clock as a patch source** (TRS or USB): the LFO's SYNC (a note value, phase-locked, START realigns it), a
+- **The MIDI clock as a patch source** (GLOBAL > CLOCK: INTERNAL, USB or TRS, the other port ignored): the LFO's SYNC (a note value, phase-locked, START realigns it), a
   CLOCK output any input can take (S+H GATE, GATE, CUTOFF, VCA CV ...), the arpeggiator on the clock's grid, a
-  tempo-synced delay. Without a MIDI clock: TEMPO.
+  tempo-synced delay. INTERNAL, or no clock: TEMPO.
 - **DUMMY cables**: a plug on its own breaks an input's normal (0 V), as on a real patchbay.
 - **Chorus, delay and plate reverb**, shared as sends; **REC switches all of them off and on**, as they were.
 - **90 factory programs** (91-99 INIT): basses, leads, patchbay tricks, clocked sounds, pads, keys, drums and drones.

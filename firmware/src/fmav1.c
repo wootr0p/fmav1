@@ -56,10 +56,12 @@ typedef struct {
     uint8_t kvel, lights;                       /* kvel: the keys' velocity; lights: the backlight + 1 (0: the default) */
     uint8_t tprog[NTRK], lvl[NTRK];             /* each track's program; the mixer's level (100 = unity) */
     int8_t pan[NTRK];                           /* the mixer's pan -64..64 */
-    uint8_t fx_off, spare[3];                   /* 0.3: REC off: every effect off (the sounds keep theirs) */
+    uint8_t fx_off, clk_src, spare[2];          /* 0.3: REC off: every effect off (the sounds keep theirs); 0.4.1: the
+                                                 * clock's source, CLK_INT / CLK_USB / CLK_TRS */
 } settings_t;
 static settings_t set;
 #define SET_SIZE_02 __builtin_offsetof(settings_t, fx_off)   /* (0.2's save: up to pan) */
+enum { CLK_INT, CLK_USB, CLK_TRS };             /* (0.4.1, the user: the tempo internal, or synced over USB or the TRS) */
 static const uint8_t TPROG_DEF[4] = {0, 10, 20, 30};   /* (CLASSIC BASS, CLASSIC LEAD, S+H FILTER, KICK) */
 static uint32_t set_dirty, set_t;
 #define LFO_STEADY_LED 1947846u                 /* ~20 Hz: the LFO button's LED lit steady over it */
@@ -163,6 +165,7 @@ enum { AC_PERF, AC_VCO, AC_VCF, AC_ENV, AC_LFO, AC_UTL, AC_JACK, AC_GLOB, AC_FX 
 #define V_TEMPO 202
 #define V_KVEL 203
 #define V_LIGHTS 204
+#define V_CLKSRC 205                            /* (0.4.1) the clock's source */
 #define V_LVL1 208                              /* the mixer: the levels, the pans (NTRK each) */
 #define V_PAN1 212
 #define NONE (-1)
@@ -227,7 +230,7 @@ static const item_t IT_GLO[] = {
     {"KEYBOARD", 1, AC_GLOB, TAB_NONE, {G_KB}, {0}, {{P_KB_SCALE, P_GLIDE, P_PRIO, P_RETRIG}},
         "LOW NOTE,|LEGATO: CLASSIC"},
     {"VOICE", 1, AC_GLOB, TAB_NONE, {G_SCOPE}, {0}, {{P_BEND, P_DRIFT, NONE, NONE}}, "ANALOG: THE|DRIFT"},
-    {"GLOBAL", 2, AC_GLOB, TAB_NONE, {G_SCOPE, G_SCOPE}, {0, 0}, {{V_MIDICH, V_TUNE, V_TEMPO, V_KVEL}, {V_LIGHTS, NONE, NONE, NONE}},
+    {"GLOBAL", 2, AC_GLOB, TAB_NONE, {G_SCOPE, G_SCOPE}, {0, 0}, {{V_MIDICH, V_TUNE, V_CLKSRC, V_TEMPO}, {V_KVEL, V_LIGHTS, NONE, NONE}},
         NTRK > 1 ? "CH N: TRACK 1|N+1: TRACK 2 .." : "MIDI CH: THE|TRACK'S CHANNEL"},
 };
 enum { S_PERF, S_EDIT, S_ENV, S_LFO, S_FX, S_PATCH, S_ARP, S_GLO, S_UTL, NSEC };
@@ -261,6 +264,9 @@ static uint32_t ncables(const uint8_t *v)
     return n;
 }
 
+static const char *const CLK_NAME[3] = {"INTERNAL", "USB", "TRS"};
+static uint32_t clk_bpm(void) { uint32_t q = quarter_len(); return (FS * 60u + q / 2u) / q; }   /* the tempo heard */
+
 /* ---- parameters, real and virtual */
 static uint32_t pmax(int32_t id)
 {
@@ -270,6 +276,7 @@ static uint32_t pmax(int32_t id)
     case V_TUNE: return 100;
     case V_TEMPO: return 200;
     case V_LIGHTS: return 10;
+    case V_CLKSRC: return CLK_TRS;
     default:
         if (id >= V_PAN1 && id < V_PAN1 + 4) return 128;
         return 127;
@@ -281,15 +288,19 @@ static int32_t pget(int32_t id)
     switch (id) {
     case V_MIDICH: return set.midi_ch;
     case V_TUNE: return set.tune + 50;
-    case V_TEMPO: return set.tempo - 40;
+    case V_TEMPO:                               /* (0.4.1: an outside clock's, once measured) */
+        if (set.clk_src != CLK_INT && ctl_ext_quarter) return clampi((int32_t)clk_bpm() - 40, 0, 200);
+        return set.tempo - 40;
     case V_KVEL: return set.kvel;
     case V_LIGHTS: return (int32_t)lights_level();
+    case V_CLKSRC: return set.clk_src;
     default:
         if (id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK) return set.lvl[id - V_LVL1];
         if (id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK) return set.pan[id - V_PAN1] + 64;
         return 0;
     }
 }
+static void clock_src_set(uint32_t v);
 static void mark_edited_t(uint32_t t) { t %= NTRK; if (!edited[t]) { edited[t] = 1; if (t == ctrk) dirty_hdr = 1; } }
 static void mark_edited(void) { mark_edited_t(ctrk); }
 static void pset_t(uint32_t t, int32_t id, int32_t v)   /* track t's sound, or a global */
@@ -319,9 +330,10 @@ static void pset_t(uint32_t t, int32_t id, int32_t v)   /* track t's sound, or a
     switch (id) {
     case V_MIDICH: set.midi_ch = (uint8_t)v; break;
     case V_TUNE: set.tune = (int8_t)(v - 50); ctl_tune8 = set.tune * 256 / 100; break;
-    case V_TEMPO: set.tempo = (uint8_t)(v + 40); ctl_tempo = set.tempo; break;
+    case V_TEMPO: if (set.clk_src != CLK_INT) return; set.tempo = (uint8_t)(v + 40); ctl_tempo = set.tempo; break;
     case V_KVEL: set.kvel = (uint8_t)(v ? v : 1); break;
     case V_LIGHTS: set.lights = (uint8_t)(v + 1); lights_apply(); break;
+    case V_CLKSRC: clock_src_set((uint32_t)v); break;
     default:
         if (id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK) { set.lvl[id - V_LVL1] = (uint8_t)v; ctl_lvl[id - V_LVL1] = (uint8_t)v; break; }
         if (id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK) { set.pan[id - V_PAN1] = (int8_t)(v - 64); ctl_pan[id - V_PAN1] = (int8_t)(v - 64); break; }
@@ -340,6 +352,7 @@ static const char *plabel(int32_t id)
     case V_TEMPO: return "TEMPO";
     case V_KVEL: return "KEY VEL";
     case V_LIGHTS: return "LIGHTS";
+    case V_CLKSRC: return "CLOCK";
     default:
         if (id >= V_LVL1 && id < V_LVL1 + 4) return NTRK > 1u ? LVL[id - V_LVL1] : "LEVEL";
         return NTRK > 1u ? PAN[(id - V_PAN1) & 3] : "PAN";
@@ -414,7 +427,14 @@ static void param_value(char *s, int32_t id, int32_t v)   /* <= 8 characters */
         case V_MIDICH: if (v) fmt_u(s, (uint32_t)v); else scat(s, "OMNI"); return;
         case V_LIGHTS: if (v) fmt_u(s, (uint32_t)v); else scat(s, "OFF"); return;
         case V_TUNE: fmt_s(s, v - 50); scat(s, "c"); return;
-        case V_TEMPO: if (ctl_ext_quarter) { scat(s, "EXT"); return; } fmt_u(s, (uint32_t)v + 40u); return;
+        case V_TEMPO:                       /* (0.4.1: a clock's, its source and the tempo measured) */
+            if (set.clk_src != CLK_INT) {       /* (locked: the sync's tempo, --- until it is measured) */
+                scat(s, CLK_NAME[set.clk_src % 3u]); scat(s, " ");
+                if (ctl_ext_quarter) fmt_u(s + slen(s), clk_bpm()); else scat(s, "---");
+                return;
+            }
+            fmt_u(s, (uint32_t)v + 40u); return;
+        case V_CLKSRC: scat(s, CLK_NAME[(uint32_t)v % 3u]); return;
         default:
             if (id >= V_PAN1 && id < V_PAN1 + 4) {
                 if (v == 64) scat(s, "C"); else { scat(s, v < 64 ? "L" : "R"); fmt_u(s + 1, (uint32_t)(v < 64 ? 64 - v : v - 64)); }
@@ -612,6 +632,13 @@ static void keys_in(uint32_t notes_only)
  * the panel is on: OberVave's fixed channels); others are ignored. OMNI: everything plays the panel's track. */
 static uint8_t midi_back[4];                    /* a program change left for the main loop (app_idle met it) */
 static uint32_t clk_n, clk_last, clk_t0;
+static void clock_src_set(uint32_t v)           /* (0.4.1) another source: what the last one measured goes */
+{
+    if (v == set.clk_src) return;
+    set.clk_src = (uint8_t)v;
+    ctl_clk_run = 0; ctl_ext_quarter = 0; clk_n = 0; ctl_clk_ext = v != CLK_INT;
+    dirty_page = 1;
+}
 static uint8_t nrpn_msb[NTRK], nrpn_lsb[NTRK];  /* (127, 127 at the start: no parameter chosen) */
 static uint8_t omni_trk[128];                   /* OMNI: the track each note began on (the panel may move meanwhile) */
 static uint32_t diag_req;
@@ -650,6 +677,8 @@ static void midi_in(uint32_t notes_only)
             midi_back[0] = st; midi_back[1] = d1; midi_back[2] = d2; midi_back[3] = 1;
             break;
         }
+        if (st >= 0xF8u && set.clk_src != (midi_rx_cable ? CLK_TRS : CLK_USB)) continue;   /* (0.4.1) the clock and
+                                                 * the transport only from the source chosen; INTERNAL: none */
         if (st == 0xF8u) {                      /* clock: 24 a quarter; the tempo from 4 quarters (OberVave's) */
             uint32_t tk = ctl_clk_ticks + 1u;   /* (0.3) the engine's place follows the clocks (0xFFFFFFFF + 1: Start's first) */
             ctl_clk_ticks = tk >= 2304u ? 0u : tk;
@@ -663,6 +692,9 @@ static void midi_in(uint32_t notes_only)
                     if (!ctl_ext_quarter || d * 1000u > 3u * q) { ctl_ext_quarter = q; if (sec == S_GLO) dirty_page = 1; }
                 }
                 clk_n = 1; clk_t0 = eng_t;
+            } else if (clk_n == 25u && !ctl_ext_quarter) {   /* (0.4.1) a first measure after one quarter */
+                uint32_t q = (eng_t - clk_t0 + 24u) / 48u * 48u;
+                if (q > FS / 5u && q < FS * 8u / 5u) { ctl_ext_quarter = q; if (sec == S_GLO) dirty_page = 1; }
             }
             continue;
         }
@@ -787,6 +819,7 @@ static void knob_view(knob_view_t *kv, uint32_t k)
     kv->max = (int32_t)pmax(id);
     kv->bip = is_bip(id);
     kv->style = KS_KNOB; kv->icl = kv->icr = IC_NONE; kv->cable = 0; kv->top = kv->bot = 0;
+    kv->locked = id == V_TEMPO && set.clk_src != CLK_INT;
     param_value(kv->value, id, kv->v);
     if (is_jack(id)) { kv->style = KS_JACK; kv->cable = kv->v ? CABLE_C[kv->v % NJSRC] : 0; return; }
     if (id == P_LFO_RATE && live.v[P_LFO_SYNC]) { kv->value[0] = 0; scat(kv->value, "SYNC "); scat(kv->value, DIV_NAME[(live.v[P_LFO_SYNC] - 1u) % NCLKDIV]); }
@@ -841,7 +874,12 @@ static void draw_page(void)
         static const uint8_t ON[3] = {P_CH_ON, P_DL_ON, P_RV_ON};
         sub = set.fx_off ? "OFF (REC)" : live.v[ON[sec_item[S_FX] % 3u]] ? "ON" : "OFF";
     }
-    if (sec == S_LFO && sec_item[S_LFO] % 2u == 1u) sub = ctl_ext_quarter ? (ctl_clk_run ? "MIDI CLOCK" : "MIDI (STOPPED)") : "TEMPO";
+    if (sec == S_LFO && sec_item[S_LFO] % 2u == 1u) {   /* (0.4.1) the clock's source and its state */
+        static const char *const RUN[3] = {"TEMPO", "USB CLOCK", "TRS CLOCK"}, *const STOP[3] = {"TEMPO", "USB (STOPPED)", "TRS (STOPPED)"},
+            *const NO[3] = {"TEMPO", "USB: NO CLOCK", "TRS: NO CLOCK"};
+        uint32_t c = set.clk_src % 3u;
+        sub = ctl_clk_run ? RUN[c] : ctl_ext_quarter ? STOP[c] : NO[c];
+    }
     if (sec == S_ARP) sub = ARP_NAME[live.v[P_ARP_MODE] % NAR];
     for (k = 0; k < 4u; k++) knob_view(&kv[k], k);
     page_map(&pm);
@@ -1105,6 +1143,10 @@ static void encoders(void)
         if ((e = fm1_enc_take(ENC_KNOB1 + k)) != 0) {
             int32_t id = page_param(k);
             if (id < 0) continue;
+            if (id == V_TEMPO && set.clk_src != CLK_INT) {   /* (0.4.1) locked: the outside clock sets it */
+                say(set.clk_src == CLK_USB ? "TEMPO: USB CLOCK" : "TEMPO: TRS CLOCK");
+                continue;
+            }
             if (is_jack(id)) {                  /* (never its own module's output); the cable swings in */
                 int32_t was = pget(id);
                 pset(id, jack_step(id, was, e));
@@ -1211,6 +1253,8 @@ static void app_main(void)
     if (!set.kvel || set.kvel > 127u) set.kvel = 100;
     if (set.lights > 11u) set.lights = 0;
     set.fx_off = set.fx_off ? 1u : 0u;
+    if (set.clk_src > CLK_TRS) set.clk_src = CLK_INT;
+    ctl_clk_ext = set.clk_src != CLK_INT;
     ctl_fx_off = set.fx_off;
     lights_apply();                             /* (every key a little lit from the start) */
     ctl_tempo = set.tempo;

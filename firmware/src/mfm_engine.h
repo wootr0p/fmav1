@@ -72,6 +72,7 @@ static volatile uint32_t ctl_arp_restart, ctl_panic;
 /* 0.3: the MIDI clock (TRS or USB): the clocks since Start, 0..2303 (0xFFFFFFFF: Start, its first clock not yet in),
  * Start seen, a clock running (else the place runs on at the tempo); REC: every effect off (the sounds keep theirs) */
 static volatile uint32_t ctl_clk_ticks = 0xFFFFFFFFu, ctl_clk_start, ctl_clk_run, ctl_fx_off;
+static volatile uint32_t ctl_clk_ext;           /* (0.4.1) GLOBAL > CLOCK is USB or TRS: the arp waits for its ticks */
 static volatile uint32_t ui_lfo_inc[NTRK];       /* the LFO's step a sample (the screen: a fast LFO's light lit steady) */
 static volatile uint8_t ctl_lvl[NTRK];          /* the mixer: level 0..127 (100 = unity; set by the app) */
 static volatile int8_t ctl_pan[NTRK];           /* -64..64 */
@@ -328,6 +329,10 @@ static void arp_tick(track_t *t)
     if (ctl_clk_run) {                          /* (0.3) a MIDI clock: the steps on its grid (the first at once) */
         uint32_t idx = clk_pos / (DIV_TICKS(ARP_DIV0 + pv[P_ARP_RATE] % NARPDIV) << 20);
         if (a->cnt == 0xFFFFFFFFu || idx != a->gidx) { a->gidx = idx; a->cnt = 0; arp_step(t); }
+        else a->cnt += CTL;
+    } else if (ctl_clk_ext) {                   /* (0.4.1) an outside clock chosen, not running: the first note, then
+                                                 * the arp waits for the clock (never the TEMPO knob's pace) */
+        if (a->cnt == 0xFFFFFFFFu) { a->cnt = 0; a->gidx = clk_pos / (DIV_TICKS(ARP_DIV0 + pv[P_ARP_RATE] % NARPDIV) << 20); arp_step(t); }
         else a->cnt += CTL;
     } else if (a->cnt == 0xFFFFFFFFu || a->cnt + CTL >= period) {
         a->cnt = a->cnt == 0xFFFFFFFFu ? 0u : a->cnt + CTL - period;

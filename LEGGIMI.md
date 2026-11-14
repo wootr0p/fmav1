@@ -1,4 +1,4 @@
-# FMav-1 0.4 per M-VAVE FM-1
+# FMav-1 0.4.1 per M-VAVE FM-1
 
 Un **sintetizzatore monofonico semi-modulare** dentro l'FM-1, ricostruito controllo per controllo e presa per presa dal
 manuale d'uso del suo strumento di riferimento: un **VCO** (dente di sega → impulso, PULSE WIDTH, PWM), un **filtro
@@ -16,6 +16,23 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > **tuo rischio**: l'autore non risponde di danni all'FM-1 (compreso un FM-1 che non si avvia più, "brickato"), ad
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
+
+## Novità della 0.4.1
+
+- **La sorgente del tempo**: **GLO → GLOBAL → CLOCK** (manopola 3):
+  - **INTERNAL** (di serie): tutto segue la manopola **TEMPO**; qualunque clock MIDI, START e STOP vengono ignorati;
+  - **USB**: il clock e START / STOP / CONTINUE solo dall'USB;
+  - **TRS**: il clock e START / STOP / CONTINUE solo dal MIDI TRS.
+
+  L'altra porta viene ignorata: con il Digitakt collegato sia in USB sia in TRS il clock non arriva più doppio.
+- Con **USB** o **TRS** la manopola **TEMPO è bloccata** (grigia; se la giri te lo dice) e mostra **il tempo letto dal
+  sync** (es. **TRS 125**; **---** finché non l'ha misurato). Il tempo si misura già dopo **un quarto**.
+- Con **USB** o **TRS** **l'arpeggiatore segue solo quel clock**: i passi cadono sui tick del clock. Con il clock fermo
+  (o non ancora arrivato) suona la prima nota e aspetta: mai al passo della manopola TEMPO.
+- In GLOBAL le manopole ora sono **MIDI CH, TUNE, CLOCK, TEMPO**, poi (seconda pagina) **KEY VEL, LIGHTS**. La pagina
+  LFO → CLOCK scrive **USB CLOCK** / **TRS CLOCK**, **(STOPPED)** quando è fermo, **NO CLOCK** se non arriva niente.
+- Dopo l'aggiornamento dalla 0.4 la sorgente parte da **INTERNAL**: per suonare a tempo col Digitakt scegli **TRS**
+  (o USB) una volta, resta salvata. Il suono non cambia.
 
 ## Novità della 0.4
 
@@ -122,7 +139,7 @@ UTL**. Ogni manopola sta in un solo posto, tranne quelle ripetute apposta su PER
 | **SEQ** | **PATCHBAY**: tutti i cavi → **INPUTS** 1-4: FOLD IN, 1V/OCT, PWM, ONE · 5-8: LFO RATE, CUTOFF, GATE, VCA CV · 9-12: TWO, S+H (NOISE), S+H GATE, ATTN |
 | **SELECT premuto** | **UTL**: FOLD, ONE LVL, ATTENUATOR, **NOISE** |
 | **ARP** | L'arpeggiatore: MODE, OCTAVES, RATE, GATE. ARP premuto di nuovo: acceso / spento |
-| **GLO** | **KEYBOARD**: KB SCALE, GLIDE, PRIO, RETRIG → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, TEMPO, KEY VEL · LIGHTS (in alto a destra la CPU) |
+| **GLO** | **KEYBOARD**: KB SCALE, GLIDE, PRIO, RETRIG → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, CLOCK, TEMPO · KEY VEL, LIGHTS (in alto a destra la CPU) |
 | **ALGORITHM** | **La traccia** sul pannello (1-4): tastiera, pagine e PRESETS lavorano su quella |
 | **PRESETS** | Il programma 01-99 della traccia (91-99 INIT) |
 | **PLAY** | HOLD (le note restano) |
@@ -199,8 +216,10 @@ loro carattere (tempi, feedback, decay…) è quello del suono della prima tracc
 - **CC fisse**: 74 CUTOFF, 71 RESONANCE, 73 ATTACK, 72 RELEASE, 75 DECAY, 5 GLIDE, 93 CHORUS SEND, 92 DELAY SEND,
   91 REVERB SEND.
 - **Clock**: attiva l'invio del clock sul Digitakt (SETTINGS → MIDI CONFIG → SYNC → CLOCK SEND, e TRANSPORT SEND per
-  START / STOP). LFO SYNC, l'uscita CLOCK, l'arpeggiatore e il delay lo seguono; START riallinea tutto all'inizio della
-  battuta. Fermato il clock, continuano al tempo misurato.
+  START / STOP) e sull'FM-1 scegli da dove arriva: **GLO → GLOBAL → CLOCK = TRS** (o **USB**; **INTERNAL** = la
+  manopola TEMPO, il clock esterno ignorato). LFO SYNC, l'uscita CLOCK, l'arpeggiatore e il delay lo seguono; START
+  riallinea tutto all'inizio della battuta. Fermato il clock, l'arpeggiatore si ferma e aspetta il clock; LFO SYNC,
+  l'uscita CLOCK e il delay continuano al tempo misurato.
 
 ## I 90 programmi di fabbrica (91-99 INIT)
 

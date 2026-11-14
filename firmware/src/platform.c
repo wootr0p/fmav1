@@ -358,6 +358,8 @@ static void smk_trim_read(void)
 #endif
 
 /* ---- MIDI over USB: 4-byte USB-MIDI packets, cable 0 */
+static uint8_t midi_rx_cable;                   /* (FMav-1 0.4.1) the last message's cable: 1 the TRS jack's clock and
+                                                 * transport (midi_uart.c), 0 USB's */
 static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)   /* 1: a message (status, data 1, data 2) */
 {
     uint32_t pk;
@@ -365,6 +367,7 @@ static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)   /* 1: a message (st
         return 0;
     pk = midi_in_q[mi_r % MQ];
     mi_r++;
+    midi_rx_cable = (uint8_t)(pk >> 4 & 15u);
     *st = (uint8_t)(pk >> 8);
     *d1 = (uint8_t)(pk >> 16);
     *d2 = (uint8_t)(pk >> 24);

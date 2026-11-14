@@ -295,6 +295,7 @@ typedef struct {
     char value[16];
     int32_t v, max, bip, present;
     uint8_t style, icl, icr;                    /* the signs at the scale's ends */
+    uint8_t locked;                             /* (0.4.1) not turnable now: grey (TEMPO under an outside clock) */
     uint16_t cable;                             /* a jack: its cable's colour (0: no cable) */
 } knob_view_t;
 #define KCELL_W 54
@@ -302,6 +303,7 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
 {
     int32_t cx = x0 + KCELL_W / 2, cy = y0 + 40, ang, px, py, qx, qy, i;
     if (!kv->present) return;
+    if (kv->locked) { acc = C_INK2; glow = 0; }
     if (glow) cv_glow(cx, cy, 26, acc, glow / 3u);   /* (the knob being turned: a soft light under it) */
     knob_label(cx, y0, kv->label, C_INK, KCELL_W - 2);
     if (kv->style == KS_JACK) {                 /* a patch point, its cable going up out of it */

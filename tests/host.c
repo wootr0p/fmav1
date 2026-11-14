@@ -217,12 +217,13 @@ static int psect_save(uint32_t i, const void *p, uint32_t n)
     return 0;
 }
 
-static uint8_t mq[64][3];
+static uint8_t mq[64][4];                       /* status, data, data, cable (1: the TRS jack) */
 static uint32_t mq_w, mq_r;
+static uint8_t midi_rx_cable;
 static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)
 {
     if (mq_r == mq_w) return 0;
-    *st = mq[mq_r % 64u][0]; *d1 = mq[mq_r % 64u][1]; *d2 = mq[mq_r % 64u][2];
+    *st = mq[mq_r % 64u][0]; *d1 = mq[mq_r % 64u][1]; *d2 = mq[mq_r % 64u][2]; midi_rx_cable = mq[mq_r % 64u][3];
     mq_r++;
     return 1;
 }
@@ -236,9 +237,10 @@ static void platform_poll(void);                /* web/sim/sim.c: a millisecond 
 #else
 
 /* the script: at t ms, keys down (bit k = key k, 0 = F3), a button edge, a MIDI message. A script file (the second
- * argument) replaces it, a line each: "T keys MASK" (hex or decimal), "T btn ID", "T midi ST D1 D2", "T enc ID N"
+ * argument) replaces it, a line each: "T keys MASK" (hex or decimal), "T btn ID", "T midi ST D1 D2" (USB; "T trs ST D1 D2":
+ * the TRS jack), "T enc ID N"
  * (encoder ID turned N detents, + = clockwise), "T btndown ID" / "T btnup ID" (a button held, let go), "T end" */
-typedef struct { uint32_t t, keys; int btn; uint8_t st, d1, d2; int8_t enc, encn; uint8_t smk, sa; uint16_t sb; } host_ev_t;
+typedef struct { uint32_t t, keys; int btn; uint8_t st, d1, d2; int8_t enc, encn; uint8_t smk, sa; uint16_t sb; uint8_t cab; } host_ev_t;
 /* SMK-37 builds (BOARD_SMK37) also: "T vel V" (the velocity of the keys pressed from now), "T pad P V" (hardware pad
  * P hit at velocity V, V 0 = let go), "T fader F V" (0..127), "T wheel W RAW" (0 pitch, 1 mod; raw ADC 0..1023),
  * "T xkey K V" (keybed key K 0..36 at V, 0 = let go: the outer keys 0..4, 32..36), "T dump" (pads and state);
@@ -284,7 +286,7 @@ static void read_script(const char *path)
         else if (!strcmp(what, "dump")) e.smk = HS_DUMP;
         else if (!strcmp(what, "check")) e.smk = HS_CHECK;   /* (SMK: KNOB BANK pressed / let go: the panel check) */
         else if (!strcmp(what, "shot")) e.smk = HS_SHOT;   /* (any board: the screen now -> OUT-<ms>.ppm) */
-        else if (!strcmp(what, "midi")) { sscanf(line, "%*u %*s %i %u %u", (int *)&a, &b, &c); e.st = (uint8_t)a; e.d1 = (uint8_t)b; e.d2 = (uint8_t)c; }
+        else if (!strcmp(what, "midi") || !strcmp(what, "trs")) { sscanf(line, "%*u %*s %i %u %u", (int *)&a, &b, &c); e.st = (uint8_t)a; e.d1 = (uint8_t)b; e.d2 = (uint8_t)c; e.cab = what[0] == 't'; }
         else continue;
         ev[n++] = e;
     }
@@ -387,6 +389,7 @@ static void platform_poll(void)                 /* one call = one millisecond */
 #endif
         } else if (script[step].st) {
             mq[mq_w % 64u][0] = script[step].st; mq[mq_w % 64u][1] = script[step].d1; mq[mq_w % 64u][2] = script[step].d2;
+            mq[mq_w % 64u][3] = script[step].cab;
             mq_w++;
         } else if (script[step].btn >= 200) {
             host_rel |= 1u << (script[step].btn - 200);

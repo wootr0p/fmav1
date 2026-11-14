@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.1 (2026-11-14)
+
+- **The clock's source**: GLOBAL > **CLOCK** = **INTERNAL** (the TEMPO knob; every MIDI clock and Start / Stop is
+  ignored), **USB** or **TRS** (the clock and Start / Stop / Continue only from that one, the other ignored). Until 0.4
+  both counted: a sequencer sending its clock on USB and TRS at once doubled it. A fresh start (or an update from 0.4)
+  is INTERNAL.
+- With USB or TRS **the arpeggiator follows that clock only**: its steps on the clock's ticks; with the clock stopped
+  (or none yet) it plays the first note and waits, never at the TEMPO knob's pace.
+- With USB or TRS **TEMPO is locked** (grey; turned, it says so) and shows the tempo the sync reads (TRS 125; --- until
+  measured). The tempo is measured after one quarter already (then refined every four, as before).
+- GLOBAL's knobs: MIDI CH, TUNE, CLOCK, TEMPO, then KEY VEL, LIGHTS. The CLOCK page says USB CLOCK / TRS CLOCK,
+  (STOPPED), or NO CLOCK.
+- The sound is unchanged.
+
 ## 0.4 (2026-11-14)
 
 - **White noise**: a generator a track; a **NOISE** level mixes it into the VCF's input (with the VCO or the folder),
