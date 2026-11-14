@@ -3,7 +3,8 @@
 **A semi-modular monophonic synthesizer for the M-VAVE FM-1.** One VCO (saw > pulse, pulse width, PWM), a four-pole
 transistor ladder filter that self-oscillates, an LFO (0.1 .. 550 Hz, triangle > square, or locked to the MIDI clock),
 an ADSR, a VCA with its MODE switch (EG / ON), a keyboard with low-note priority, legato triggering, glide and KB SCALE,
-a wave folder, a sample & hold, a two-channel mixer, an attenuator, and a patchbay of 12 inputs with their normals,
+a wave folder, a sample & hold (on white noise), a two-channel mixer, an attenuator, a white-noise source, and a
+patchbay of 12 inputs with their normals,
 every cable running a sample at a time (the LFO, the S+H and the VCO patch into the pitch, the pulse width, the cutoff
 and the folder at audio rate).
 
@@ -18,9 +19,10 @@ and the folder at audio rate).
   for every parameter, the cables included, and NRPN) or from the keys. No sequencer: sequence it from a Digitakt or
   anything that sends MIDI.
 
-The panel: a button opens a section, SELECT turned runs through its pages, the four knobs are the page's, SELECT pressed
-opens UTL (folder, mixer, attenuator). An input jack is a knob that picks the output its cable comes from. SEQ shows the
-whole patchbay with its cables, then every input on the knobs. The screen is our own drawing (white print on black,
+The panel: a button opens a section (pressed again: its next page), SELECT turned runs through its pages, the four knobs
+are the page's, SELECT pressed opens UTL (folder, mixer, attenuator, noise). Every knob has one place (PERFORM repeats
+the most played on purpose). An input jack is a knob that picks the output its cable comes from: SEQ shows the whole
+patchbay with its cables, then every input on the knobs. The screen is our own drawing (white print on black,
 vertical module tabs, a 13-button keyboard), animated (the LFO LED, the tracks' lamps, the cables' swing, the boot: a
 cable plugged into VCA OUT).
 
@@ -35,7 +37,7 @@ the changes [CHANGELOG.md](CHANGELOG.md).
 From The Firmware Hub (one click, Chrome / Edge), or with the installer from a release:
 
 ```sh
-python3 tools/fm1_install.py fmav1-0.3.1.fwsc --yes    # FM-1 on USB, switched on
+python3 tools/fm1_install.py fmav1-0.4.fwsc --yes      # FM-1 on USB, switched on
 ```
 
 It installs over most FM-1 firmwares (Felucca, SLOOP, OberVave and their forks) and keeps their stored programs
@@ -45,7 +47,7 @@ the installer again.
 ## Build
 
 ```sh
-sh build.sh --release 0.3.1                            # build/fmav1-0.3.1.fwsc
+sh build.sh --release 0.4                              # build/fmav1-0.4.fwsc
 OBV_DEFS=-DMFM_NTRK=1u sh build.sh                     # the one-track build
 sh tests/run_host.sh tests/mfm_programs.txt programs   # on a computer: build/host/programs.wav and the screens
 sh tests/run_tests.sh                                  # every host test, sanitizers and a parameter fuzz (~25 min)

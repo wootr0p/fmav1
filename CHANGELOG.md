@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4 (2026-11-14)
+
+- **White noise**: a generator a track; a **NOISE** level mixes it into the VCF's input (with the VCO or the folder),
+  and a **NOISE** output on the patchbay takes it to any input. With DUMMY in FOLD IN the VCF hears the noise alone.
+- **The S+H samples the white noise** when S+H IN has no cable (it sampled the VCO). Programs saved by earlier versions
+  that use the S+H get the cable VCO > S+H IN, so they sound as they did.
+- **No knob twice** but on PERFORM: the cables only on SEQ (the modules' INPUTS pages and the S+H page are gone), UTL one
+  page (FOLD, ONE LVL, ATTENUATOR, NOISE), TEMPO only on GLOBAL.
+- **A section's button pressed again turns to its next page**, as SELECT (ARP again: the arp on / off).
+- **18 factory programs remade with the noise** (drums, wind, the random S+H sounds, a breath on a few leads and pads, a
+  noise riser); the other 72 render bit-identical to 0.3.1.
+- The programs' name has a fixed place (new parameters need no conversion from now on); 0.1 .. 0.3.1 saves converted.
+- The patch cables' CC values change (one more source: see CC-NRPN.md); NOISE is CC 86.
+
 ## 0.3.1 (2026-11-14)
 
 - **DUMMY** last in every input's list (after the MIDI sources).

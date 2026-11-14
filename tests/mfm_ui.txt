@@ -4,15 +4,15 @@
 1500 midi 0xC0 15 0
 1600 midi 0x90 60 100
 1800 btn 4
-1900 enc 0 2
+1900 enc 0 1
 2000 enc 3 1
 2200 shot
 2300 enc 3 -1
 2400 btn 6
 2500 enc 3 30
 2700 shot
-2800 enc 0 4
-2900 enc 2 2
+2800 btn 6
+2900 btn 6
 3100 shot
 3200 btn 2
 3300 enc 2 1
@@ -36,6 +36,7 @@
 5700 shot
 5800 btn 3
 5900 enc 2 40
+5950 enc 5 60
 6100 shot
 6200 btn 3
 6400 shot
@@ -44,9 +45,9 @@
 6600 btnup 6
 6800 shot
 6900 btn 5
-7000 enc 5 12
+7000 enc 4 12
 7200 shot
-7300 enc 0 2
+7300 enc 0 1
 7500 shot
 7600 btn 10
 7700 midi 0xFA 0 0

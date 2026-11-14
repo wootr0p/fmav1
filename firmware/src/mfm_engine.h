@@ -50,6 +50,7 @@ typedef struct {
     lad_t lad;
     ladc_t lc;
     int32_t lc_key;                             /* the ladder's coefficients are for this cutoff / resonance */
+    uint32_t nrnd;                              /* (0.3.2) the white noise's generator (xorshift), one a track */
     int32_t sh;                                 /* the S+H's held voltage */
     int32_t o[NJSRC];                           /* the outputs, volts (Q12), as they are now */
     int32_t cut_sm, res_sm, pw_sm, wave_sm, lw_sm;   /* the knobs, slewed (a CC's steps glide), Q8 */
@@ -144,6 +145,14 @@ static void clock_block(void)
         clk_pos += clk_adv;
         if (clk_pos >= CLK_WRAP) clk_pos -= CLK_WRAP;
     }
+}
+/* (0.4) one white-noise value, +-5 V (the S+H's normal when the noise is not running) */
+static inline int32_t noise_one(uint32_t *st)
+{
+    uint32_t r = *st;
+    r ^= r << 13; r ^= r >> 17; r ^= r << 5;
+    *st = r;
+    return (((int32_t)(r >> 16) - 32768) * 5) >> 3;
 }
 /* the Q8 pitch whose step is inc (pitch_inc's inverse, by halving: a synced LFO with a cable on LFO RATE) */
 static int32_t p8_of_inc(uint32_t inc)
@@ -374,8 +383,8 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
 {
     const uint8_t *pv = t->p->v;
     int32_t *o = t->o;
-    uint32_t i, gate, lfo_inc = 0;
-    int32_t kb8, kbcv, scl, p_base, c_base, deg, vco_mx, vcf_mx, pamt, wamt, famt, vol, attn, one, fg, gl, gr, pos;
+    uint32_t i, gate, lfo_inc = 0, nz_on;
+    int32_t kb8, kbcv, scl, p_base, c_base, deg, vco_mx, vcf_mx, pamt, wamt, famt, vol, attn, one, fg, gl, gr, pos, nlev;
     int32_t lfo_p8, lw, ww, duty0;
     uint8_t jk[NJIN];
     for (i = 0; i < NJIN; i++) jk[i] = (uint8_t)(jack_ok(i, pv[PJ(i)]) ? pv[PJ(i)] : 0u);   /* (never its own output) */
@@ -455,6 +464,8 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
     attn = lin_q15(pv[P_ATTN]);
     one = lin_q15(pv[P_ONE_LVL]);
     fg = 4096 + (int32_t)pv[P_FOLD] * 161;      /* the folder's gain, Q12: 1 .. 6 (three folds of a 5 V wave) */
+    nlev = lin_q15(pv[P_NOISE]);                /* (0.3.2) the noise into the VCF: +-5 V at the top */
+    for (i = 0, nz_on = nlev != 0; i < NJIN; i++) nz_on |= jk[i] == J_NOISE;   /* (it runs only when heard) */
     pos = clampi(ctl_pan[ti], -64, 64) + 64;    /* (the track's pan, from the mixer; x 2: the middle is +3 dB, 5 V out of
                                                  * the VCA ~-1 dBFS) */
     gl = PAN_Q12[128 - pos] * 2; gr = PAN_Q12[pos] * 2;
@@ -462,6 +473,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
         int32_t eg = t->eg0 + (int32_t)(((t->eg - t->eg0) >> 4) * (int32_t)i), egv = eg >> 9, lfo, mv, p8, x, y, c8, g, s, d16;
         uint32_t li;
         o[J_EG] = egv;
+        if (nz_on) o[J_NOISE] = noise_one(&t->nrnd);   /* (0.4) white noise, +-5 V, the track's own, while it is heard */
         /* LFO */
         li = jk[I_LFORATE] ? pitch_inc(lfo_p8 + ((o[jk[I_LFORATE]] * 3) >> 2)) : lfo_inc;
         lfo = mlfo_tick(&t->lfo, li, lw);
@@ -480,7 +492,8 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
         {
             int32_t gv = o[jk[I_SHGATE] ? jk[I_SHGATE] : J_LFO];
             if (!t->sh_hi && gv > 5 * VOLT / 2) {
-                t->sh_hi = 1; t->sh = o[jk[I_SHIN] ? jk[I_SHIN] : J_VCO];
+                t->sh_hi = 1;                   /* (0.4: no cable in S+H IN: the white noise, drawn now if it is not running) */
+                t->sh = jk[I_SHIN] ? o[jk[I_SHIN]] : nz_on ? o[J_NOISE] : noise_one(&t->nrnd);
                 ui_sh_hist[ti][ui_sh_n[ti] & 15u] = (int16_t)clampi(t->sh >> 2, -32767, 32767); ui_sh_n[ti]++;
             }
             else if (t->sh_hi && gv < VOLT) t->sh_hi = 0;
@@ -499,6 +512,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
         }
         /* the VCF's input: FOLD IN patched -> the folder (the VCO bypassed), else the VCO */
         x = jk[I_FOLD] ? fold_tick(&t->fold, o[jk[I_FOLD]], fg) : o[J_VCO];
+        if (nlev) x += (o[J_NOISE] * nlev) >> 15;   /* (0.3.2) the noise, mixed in with its level */
         /* the cutoff: the knob, the CUTOFF input (1 V an octave), the VCF MOD (the EG / LFO mix x the bipolar AMT) */
         mv = egv + (((o[J_LFO] - egv) * (vcf_mx >> 1)) >> 14);
         c8 = c_base + ((((mv * 3) >> 2) * (famt >> 1)) >> 14);
@@ -681,6 +695,7 @@ static void engine_init(void)
         t->note = 60;
         t->kb16 = t->target16 = 60 << 16;
         t->lc_key = -1;
+        t->nrnd = 0x2545F491u * (ti + 1u);      /* (never 0: xorshift stays at 0) */
         ctl_cc7[ti] = 127; ui_note[ti] = 255;
     }
     fx_init();

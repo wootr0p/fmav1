@@ -16,7 +16,7 @@ for ch in range(n):
                  (PJ("I_LFORATE"), P["J_KBCV"]), (PJ("I_1VOCT"), P["J_ATTN"]), (PJ("I_ATTN"), P["J_EG"]), (P["P_RES"], 115),
                  (P["P_VCF_AMT"], 100), (P["P_PWM_AMT"], 80), (P["P_WAVE"], 64), (PJ("I_VCACV"), P["J_LFO"]),
                  (PJ("I_PWM"), P["J_LFO"]), (P["P_GLIDE"], 40), (P["P_VOLUME"], 90),
-                 (P["P_CH_ON"], 1), (P["P_DL_ON"], 1), (P["P_RV_ON"], 1)):   # (0.2: the chorus, and the delay and reverb sends)
+                 (P["P_CH_ON"], 1), (P["P_DL_ON"], 1), (P["P_RV_ON"], 1), (P["P_NOISE"], 64)):   # (0.2: the chorus, and the delay and reverb sends)
         L += nrpn(t, p, v, ch)
         t += 2
 for k in range(12):

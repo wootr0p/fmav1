@@ -160,7 +160,7 @@ static int32_t res_row(uint32_t res) { return res <= 112u ? (int32_t)res * 16 : 
 static void g_filter(const uint8_t *pv, uint32_t ti, uint16_t c)
 {
     static int32_t yq[220];
-    char s[40];
+    char s[64];                                 /* (0.3.2: room for "+ ONE+TWO  IN: FOLDER + NOISE") */
     int32_t knob8 = CUT_LO8 + pv[P_CUTOFF] * 16 * (CUT_SPAN8 >> 3) / 254, cut8 = knob8, x, rq = res_row(pv[P_RES]);
     int playing = ui_note[ti % NTRK] != 255u;
     if (playing) cut8 = ui_cut8[ti % NTRK];
@@ -190,6 +190,7 @@ static void g_filter(const uint8_t *pv, uint32_t ti, uint16_t c)
     s[0] = 0; scat(s, "LADDER 24 dB");
     if (pv[PJ(I_CUTOFF)]) { scat(s, "  + "); scat(s, JSRC_NAME[pv[PJ(I_CUTOFF)] % NJSRC]); }
     if (pv[PJ(I_FOLD)]) scat(s, "  IN: FOLDER");
+    if (pv[P_NOISE]) scat(s, " + NOISE");
     g_label(GX0 + 2, GY0, s, c);
     s[0] = 0; fmt_hz(s, cut_hz(pv[P_CUTOFF])); scat(s, " Hz");
     g_label_r(s, c);
@@ -237,7 +238,7 @@ static void g_sh(const uint8_t *pv, uint32_t ti, uint16_t c)
         cv_rect(x, y, 13, 2, i == 15u ? C_TEXT : c);
     }
     s[0] = 0;
-    scat(s, pv[PJ(I_SHIN)] ? JSRC_NAME[pv[PJ(I_SHIN)] % NJSRC] : "VCO");
+    scat(s, pv[PJ(I_SHIN)] ? JSRC_NAME[pv[PJ(I_SHIN)] % NJSRC] : "NOISE");
     scat(s, " SAMPLED BY ");
     scat(s, pv[PJ(I_SHGATE)] ? JSRC_NAME[pv[PJ(I_SHGATE)] % NJSRC] : "LFO");
     g_label(GX0 + 2, GY0, s, c);
@@ -324,7 +325,7 @@ static void g_attn(const uint8_t *pv, uint32_t ti, uint16_t c)
 static const uint16_t CABLE_C[NJSRC] = {RGB(60, 60, 60), RGB(240, 240, 236), RGB(96, 172, 255), RGB(255, 150, 56),
     RGB(186, 146, 255), RGB(118, 222, 128), RGB(255, 214, 70), RGB(255, 110, 150), RGB(255, 110, 150), RGB(84, 208, 226),
     RGB(255, 88, 76), RGB(255, 88, 76), RGB(200, 200, 120), RGB(200, 200, 120), RGB(200, 200, 120), RGB(250, 250, 200),
-    RGB(130, 130, 136)};
+    RGB(130, 130, 136), RGB(214, 226, 255)};
 typedef struct { uint8_t out, id; const char *lbl; } pbcell_t;   /* out: an output (id J_*), else an input (id I_*) */
 #define PB_ROWS 7u
 static const pbcell_t PB[PB_ROWS][3] = {
@@ -332,7 +333,7 @@ static const pbcell_t PB[PB_ROWS][3] = {
     {{0, I_1VOCT, "1V/OCT"}, {0, I_PWM, "PWM"}, {0, I_ONE, "ONE (-5)"}},
     {{0, I_LFORATE, "LFO RATE"}, {0, I_CUTOFF, "CUTOFF"}, {1, J_ONE, "ONE"}},
     {{0, I_GATE, "GATE"}, {0, I_VCACV, "VCA CV"}, {0, I_TWO, "TWO"}},
-    {{1, J_VCO, "VCO"}, {0, I_SHIN, "S+H (VCO)"}, {1, J_ONETWO, "ONE+TWO"}},
+    {{1, J_VCO, "VCO"}, {0, I_SHIN, "S+H (NOISE)"}, {1, J_ONETWO, "ONE+TWO"}},
     {{1, J_LFO, "LFO"}, {0, I_SHGATE, "S+H GATE"}, {0, I_ATTN, "ATTN (+5)"}},
     {{1, J_EG, "EG"}, {1, J_SH, "S+H"}, {1, J_ATTN, "ATTN"}},
 };

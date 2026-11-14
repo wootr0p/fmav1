@@ -27,11 +27,12 @@ NAME = {
     "P_RV_WIDTH": "REVERB WIDTH *",
     "P_LFO_SYNC": "LFO SYNC (FREE, 8/1 .. 1/32T) *", "P_CLK_DIV": "CLOCK: valore di nota (8/1 .. 1/32T) *",
     "P_CLK_WIDTH": "CLOCK GATE (durata dell'impulso) *",
+    "P_NOISE": "NOISE: il rumore bianco nel VCF *",
 }
-JIN = ["1V/OCT", "PWM", "CUTOFF", "VCA CV", "LFO RATE", "GATE", "FOLD IN", "S+H IN", "S+H GATE", "ONE", "TWO", "ATTN",
+JIN = ["1V/OCT", "PWM", "CUTOFF", "VCA CV", "LFO RATE", "GATE", "FOLD IN", "S+H IN (senza cavo: NOISE)", "S+H GATE", "ONE", "TWO", "ATTN",
        "(MULT: non c'è più, ignorata)"]
 JSRC = ["nessun cavo", None, "KB CV", "VCO", "LFO", "EG", "S+H", "ONE", "ONE+TWO", "ATTN", None, None, "VELO *",
-        "MODWHL *", "PRESS *", "CLOCK *", "DUMMY (spina sola: 0 V, niente normalizzazione) *"]   # (None: not offered)
+        "MODWHL *", "PRESS *", "CLOCK *", "DUMMY (spina sola: 0 V, niente normalizzazione) *", "NOISE (rumore bianco) *"]   # (None: not offered)
 
 
 def names():

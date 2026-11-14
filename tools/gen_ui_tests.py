@@ -8,7 +8,7 @@ HDR = ("# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SA
        "# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS\n")
 
 # ---- every section (its button), every page (SELECT turned), a note held so the live graphs show it
-SECTIONS = [(8, 5), (6, 5), (4, 3), (5, 3), (2, 7), (11, 4), (3, 3), (10, 1), (7, 4)]   # (button, its pages: 4 tracks)
+SECTIONS = [(8, 5), (6, 3), (4, 2), (5, 2), (2, 7), (11, 4), (3, 1), (10, 1), (7, 4)]   # (button, its pages: 4 tracks)
 L = ["# every section, every page (SELECT turned; SELECT pressed: UTL), a note held so the live graphs show it\n" + HDR
      + "1500 midi 0xC0 0 0\n1600 midi 0x90 48 100"]
 t = 1800
@@ -28,18 +28,18 @@ Path("tests/mfm_nav.txt").write_text("\n".join(L) + "\n")
 # ALGORITHM; OCT+ twice (its LED blinking) and back; PLAY (HOLD)
 A = [
     (1500, "midi 0xC0 15 0"), (1600, "midi 0x90 60 100"),
-    (1800, "btn 4"), (1900, "enc 0 2"), (2000, "enc 3 1"), (2200, "shot"), (2300, "enc 3 -1"),   # VCA: MODE ON, EG
+    (1800, "btn 4"), (1900, "enc 0 1"), (2000, "enc 3 1"), (2200, "shot"), (2300, "enc 3 -1"),   # VCA: MODE ON, EG
     (2400, "btn 6"), (2500, "enc 3 30"), (2700, "shot"),                                         # VCO: WAVE
-    (2800, "enc 0 4"), (2900, "enc 2 2"), (3100, "shot"),                                        # VCF INPUTS: KB CV
+    (2800, "btn 6"), (2900, "btn 6"), (3100, "shot"),                                            # EDIT again: next pages
     (3200, "btn 2"), (3300, "enc 2 1"), (3500, "shot"),                                          # CHORUS ON
     (3600, "enc 0 2"), (3700, "enc 2 1"), (3800, "enc 3 -20"), (4000, "shot"),                   # DELAY ON, SEND
     (4100, "btn 13"), (4300, "shot"), (4400, "btn 13"), (4600, "shot"),                          # REC: off, on
     (4700, "btn 11"), (4900, "shot"), (5000, "btn 11"), (5100, "enc 2 3"), (5200, "enc 3 1"),   # SEQ: overview; INPUTS
-    (5250, "enc 5 20"), (5400, "shot"), (5500, "btn 11"), (5700, "shot"),                     # (ONE: last, DUMMY); overview
-    (5800, "btn 3"), (5900, "enc 2 40"), (6100, "shot"), (6200, "btn 3"), (6400, "shot"),         # UTL (SELECT pressed)
+    (5250, "enc 5 20"), (5400, "shot"), (5500, "btn 11"), (5700, "shot"),                     # (ONE: DUMMY); next page
+    (5800, "btn 3"), (5900, "enc 2 40"), (5950, "enc 5 60"), (6100, "shot"), (6200, "btn 3"), (6400, "shot"),   # UTL
     (6500, "btndown 6"), (6550, "btn 0"), (6600, "btnup 6"), (6800, "shot"),                     # EDIT + OCT-: undo
-    (6900, "btn 5"), (7000, "enc 5 12"), (7200, "shot"),                                         # LFO SYNC 1/8
-    (7300, "enc 0 2"), (7500, "shot"),                                                           # CLOCK
+    (6900, "btn 5"), (7000, "enc 4 12"), (7200, "shot"),                                         # LFO SYNC 1/8
+    (7300, "enc 0 1"), (7500, "shot"),                                                           # CLOCK
     (7600, "btn 10"),                                                                            # the arp on
     (7700, "midi 0xFA 0 0"),
 ]

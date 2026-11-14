@@ -16,7 +16,8 @@ import mido
 # attenuator on 1V/OCT, the LFO on the VCA and (by the mult) on PWM, a resonant ladder
 WORST = [(30, 60), (33, 28), (34, 20), (21, 90), (20, 110), (14, 120), (12, 40), (26, 44), (28, 12), (24, 68), (35, 36),
          (1, 115), (2, 100), (13, 80), (8, 64), (27, 28), (25, 28), (18, 40), (16, 90),
-         (45, 64), (50, 64), (59, 64)]   # (0.2: the chorus, delay and reverb on; 0.3: the sources renumbered, no mult)
+         (45, 64), (50, 64), (59, 64), (69, 64)]   # (0.2: the chorus, delay and reverb on; 0.3: the sources renumbered, no
+                                         # mult; 0.4: the noise)
 INIT = 98                                       # program 99
 
 

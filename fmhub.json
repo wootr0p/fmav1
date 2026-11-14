@@ -1,5 +1,5 @@
 {
-  "what": "A semi-modular mono synth: VCO, self-oscillating 4-pole ladder filter, LFO, ADSR, VCA, wave folder, S+H, mixer and a patchbay with normals and dummy plugs. Four tracks, the MIDI clock as a patch source (synced LFO, CLOCK out), chorus, delay and reverb, 90 sounds.",
+  "what": "A semi-modular mono synth: VCO, self-oscillating 4-pole ladder filter, LFO, ADSR, VCA, wave folder, white noise, S+H, mixer and a patchbay with normals and dummy plugs. Four tracks, MIDI clock as a patch source, chorus, delay and reverb, 90 sounds.",
   "author": "wootr0p",
   "kinds": [
     "synth"

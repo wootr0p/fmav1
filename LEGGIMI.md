@@ -1,11 +1,11 @@
-# FMav-1 0.3.1 per M-VAVE FM-1
+# FMav-1 0.4 per M-VAVE FM-1
 
 Un **sintetizzatore monofonico semi-modulare** dentro l'FM-1, ricostruito controllo per controllo e presa per presa dal
 manuale d'uso del suo strumento di riferimento: un **VCO** (dente di sega → impulso, PULSE WIDTH, PWM), un **filtro
 ladder a transistor a 4 poli** che auto-oscilla, l'**LFO** (0,1-550 Hz, triangolo → quadra, ora anche **a tempo**),
 l'**EG ADSR**, il **VCA** con l'interruttore **VCA MODE**, la **tastiera** (priorità alla nota più bassa, legato, GLIDE,
-KB SCALE), il **wave folder**, il **Sample + Hold**, il **mixer ONE+TWO**, l'**attenuatore** e il **patchbay** con le
-sue **normalizzazioni**. Nessun sequencer: si suona dal Digitakt via MIDI TRS (o USB, o dai tasti).
+KB SCALE), il **wave folder**, il **Sample + Hold**, il **mixer ONE+TWO**, l'**attenuatore**, il **rumore bianco** e il
+**patchbay** con le sue **normalizzazioni**. Nessun sequencer: si suona dal Digitakt via MIDI TRS (o USB, o dai tasti).
 
 **Quattro tracce** stile Felucca, ognuna col suo suono, sui canali MIDI N, N+1, N+2, N+3. **Chorus, delay e riverbero**
 in comune. **90 programmi di fabbrica**, dal 91 al 99 INIT.
@@ -16,6 +16,29 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > **tuo rischio**: l'autore non risponde di danni all'FM-1 (compreso un FM-1 che non si avvia più, "brickato"), ad
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
+
+## Novità della 0.4
+
+- **Il rumore bianco (NOISE)**: un generatore per traccia.
+  - Il suo livello, **NOISE**, è una manopola che lo **mescola nell'ingresso del VCF**, insieme al VCO (o al folder).
+  - È anche **un'uscita del patchbay**: va in qualunque presa (S+H, CUTOFF, PWM, 1V/OCT, FOLD IN…).
+  - Con **DUMMY in FOLD IN** il VCF riceve solo il rumore: rullanti, hi-hat, vento, onde.
+- **Il S+H campiona il rumore bianco** quando S+H IN è senza cavo: tensioni davvero casuali, il S+H classico. Il
+  campionamento del VCO (sequenze legate all'intonazione) resta con un cavo S+H IN ← VCO, e i programmi salvati con le
+  versioni precedenti che usano il S+H lo ricevono da soli, così suonano come prima.
+- **Nessuna manopola doppia**, a parte la pagina PERFORM (HOME), che resta la pagina veloce:
+  - **i cavi si collegano solo da SEQ** (PATCHBAY + INPUTS): le pagine INPUTS dei moduli non ci sono più;
+  - **UTL** (SELECT premuto) è **una pagina sola**: FOLD, ONE LVL, ATTENUATOR, NOISE;
+  - **TEMPO** sta solo in GLOBAL (non più anche in LFO → CLOCK);
+  - la pagina S+H di LFO non c'è più: le sue prese sono in SEQ.
+- **Il tasto della sezione premuto di nuovo va alla pagina dopo**, come girare SELECT di uno scatto. Fa eccezione ARP,
+  che premuto di nuovo accende e spegne l'arpeggiatore.
+- **I preset rifatti con il rumore** (18 su 90; gli altri 72 suonano identici alla 0.3.1):
+  - su rumore vero: 34 NOISE HIT, 69 CLOCK HATS, 79 WIND, 81 SNARE, 82 HI-HAT, 83 CLAP;
+  - con il S+H casuale: 21 S+H FILTER, 22 S+H MELODY, 38 BLIPS, 63 CLOCK S+H, 64 CLOCK MELODY;
+  - con un soffio di rumore: 32 TOM, 52 WHISTLE, 54 SOFT LEAD, 77 PAD SWEEP, 78 VOX, 90 DARK DRONE;
+  - con lo sweep di rumore: 87 RISER.
+- Le CC dei cavi: con una sorgente in più cambiano i valori da mandare per ogni uscita (`CC-NRPN.md`). NOISE ha la CC 86.
 
 ## Novità della 0.3.1
 
@@ -71,7 +94,7 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 2. Da questa cartella:
 
    ```
-   py fm1_install.py fmav1-0.3.1.fwsc --yes
+   py fm1_install.py fmav1-0.4.fwsc --yes
    ```
 
    Per vedere cosa c'è installato: `py fm1_install.py --info`
@@ -85,18 +108,19 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 
 ## I comandi
 
-**Un pulsante apre una sezione** (premuto di nuovo salta all'elemento dopo), **SELECT girato scorre tutte le sue
-pagine**, **le 4 manopole** sono i 4 parametri sullo schermo (accelerano se giri veloce), **SELECT premuto apre UTL**.
+**Un pulsante apre una sezione** (premuto di nuovo passa alla pagina dopo, come SELECT), **SELECT girato scorre tutte
+le sue pagine**, **le 4 manopole** sono i 4 parametri sullo schermo (accelerano se giri veloce), **SELECT premuto apre
+UTL**. Ogni manopola sta in un solo posto, tranne quelle ripetute apposta su PERFORM; i cavi si collegano da SEQ.
 
 | Pulsante | Le pagine che SELECT scorre |
 | --- | --- |
 | **HOME** | **PERFORM**: CUTOFF, RESONANCE, VCF MOD AMT, DECAY · VCO WAVE, PULSE WIDTH, LFO RATE, GLIDE · PITCH MOD AMT, PWM AMT, FOLD, VOLUME → **MIXER**: i LEVEL delle 4 tracce · i loro PAN |
-| **EDIT** | **VCO**: PITCH, VCO WAVE, PULSE WIDTH, FINE · **MOD**: VCO MOD MIX, PITCH MOD AMT, PWM AMT · **INPUTS**: le prese 1V/OCT e PWM → **VCF**: CUTOFF, RESONANCE, VCF MOD MIX, VCF MOD AMT · **INPUTS**: le prese CUTOFF (KB CV = il filtro segue la tastiera) e FOLD IN, FOLD |
-| **ENV** | **EG**: ATTACK, DECAY, SUSTAIN, RELEASE · **INPUTS**: la presa GATE → **VCA**: VOLUME, **VCA MODE** (EG / ON), la presa VCA CV |
-| **LFO** | **LFO**: LFO RATE, LFO WAVE, la presa LFO RATE, **SYNC** → **S+H**: le prese S+H (VCO) e S+H GATE → **CLOCK**: CLOCK (valore di nota), GATE, TEMPO |
+| **EDIT** | **VCO**: PITCH, VCO WAVE, PULSE WIDTH, FINE · **MOD**: VCO MOD MIX, PITCH MOD AMT, PWM AMT → **VCF**: CUTOFF, RESONANCE, VCF MOD MIX, VCF MOD AMT |
+| **ENV** | **EG**: ATTACK, DECAY, SUSTAIN, RELEASE → **VCA**: VOLUME, **VCA MODE** (EG / ON) |
+| **LFO** | **LFO**: LFO RATE, LFO WAVE, **SYNC** → **CLOCK**: CLOCK (valore di nota), GATE |
 | **FX** | **CHORUS**: ON, TYPE, SEND · RATE, DEPTH → **DELAY**: ON, SEND, TIME L, TIME R · FEEDBACK, PING-PONG, WIDTH · LOW CUT, HIGH CUT → **REVERB**: ON, SEND, DECAY, DAMP · PRE-DELAY, DIFFUSION, WIDTH |
-| **SEQ** | **PATCHBAY**: tutti i cavi → **INPUTS** 1-4: FOLD IN, 1V/OCT, PWM, ONE · 5-8: LFO RATE, CUTOFF, GATE, VCA CV · 9-12: TWO, S+H (VCO), S+H GATE, ATTN. **SEQ di nuovo**: dall'una all'altra |
-| **SELECT premuto** | **UTL**: **WAVE FOLDER**: FOLD, la presa FOLD IN → **MIXER**: ONE LVL, le prese ONE e TWO → **ATTENUATOR**: ATTENUATOR, la presa ATTN |
+| **SEQ** | **PATCHBAY**: tutti i cavi → **INPUTS** 1-4: FOLD IN, 1V/OCT, PWM, ONE · 5-8: LFO RATE, CUTOFF, GATE, VCA CV · 9-12: TWO, S+H (NOISE), S+H GATE, ATTN |
+| **SELECT premuto** | **UTL**: FOLD, ONE LVL, ATTENUATOR, **NOISE** |
 | **ARP** | L'arpeggiatore: MODE, OCTAVES, RATE, GATE. ARP premuto di nuovo: acceso / spento |
 | **GLO** | **KEYBOARD**: KB SCALE, GLIDE, PRIO, RETRIG → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, TEMPO, KEY VEL · LIGHTS (in alto a destra la CPU) |
 | **ALGORITHM** | **La traccia** sul pannello (1-4): tastiera, pagine e PRESETS lavorano su quella |
@@ -128,22 +152,24 @@ spina senza niente dall'altra parte (la normalizzazione tolta, 0 V).
 | **LFO RATE** | --- | si somma alla velocità dell'LFO, 1 V = 1 ottava |
 | **GATE** | --- | fa partire l'EG (sopra 3,5 V) insieme alla tastiera |
 | **FOLD IN** | --- (folder fuori) | quello che entra passa nel wave folder e va al **VCF al posto del VCO** |
-| **S+H (VCO)** | **(VCO)** | quello che il S+H campiona |
+| **S+H (NOISE)** | **(NOISE)** | quello che il S+H campiona (0.4: il rumore bianco; prima il VCO) |
 | **S+H GATE** | **(LFO)** | quando campiona (a ogni salita) |
 | **ONE (-5)** | **(-5V)** | il canale 1 del mixer, col suo ONE LVL |
 | **TWO** | --- | il canale 2 del mixer, a guadagno 1 |
 | **ATTN (+5)** | **(+5V)** | quello che l'ATTENUATOR riduce (senza cavo: una tensione 0..+5 V) |
 
-Le uscite: **KB CV**, **VCO**, **LFO**, **EG**, **S+H**, **ONE**, **ONE+TWO**, **ATTN**, il **CLOCK**, tre sorgenti MIDI
-**VELO**, **MODWHL**, **PRESS** (0..+5 V) e **DUMMY**. **VCA OUT** è l'uscita audio. Una stessa uscita può andare a
+Le uscite: **KB CV**, **VCO**, **LFO**, **EG**, **S+H**, **ONE**, **ONE+TWO**, **ATTN**, il **NOISE** (rumore bianco),
+il **CLOCK**, tre sorgenti MIDI **VELO**, **MODWHL**, **PRESS** (0..+5 V) e **DUMMY**. **VCA OUT** è l'uscita audio. Una stessa uscita può andare a
 quante prese vuoi; un ingresso non prende mai le uscite del suo modulo. Le tensioni: VCO, LFO e S+H ±5 V, EG 0-8 V, il
-mixer satura a ±8 V, CLOCK 0/+5 V.
+mixer satura a ±8 V, NOISE ±5 V, CLOCK 0/+5 V.
 
 **Qualche patch per cominciare:**
 
-- **Wave folding**: SELECT premuto → WAVE FOLDER, manopola 2 (FOLD IN) su **VCO**, poi gira FOLD.
-- **Il filtro che segue la tastiera**: EDIT → VCF → INPUTS, manopola 1 (CUTOFF) su **KB CV**. Con la RESONANCE al
+- **Wave folding**: SEQ → INPUTS, manopola 1 (FOLD IN) su **VCO**, poi SELECT premuto (UTL) e gira FOLD.
+- **Il filtro che segue la tastiera**: SEQ → INPUTS 5-8, manopola 2 (CUTOFF) su **KB CV**. Con la RESONANCE al
   massimo il filtro diventa un oscillatore sinusoidale suonabile (con DUMMY in FOLD IN resta solo lui: 52 WHISTLE).
+- **Solo rumore**: FOLD IN su **DUMMY**, UTL → NOISE al massimo, e il filtro lo modella (programmi 79-83).
+- **Note casuali**: il S+H campiona già il rumore; 1V/OCT ← ATTN, ATTN ← S+H, ATTENUATOR basso (programma 22).
 - **S+H a tempo sul filtro**: S+H GATE ← CLOCK, CUTOFF ← S+H (programma 63 CLOCK S+H).
 - **Melodie casuali a tempo**: 1V/OCT ← ATTN, ATTN ← S+H, S+H GATE ← CLOCK, GATE ← CLOCK (programma 64; suona da solo).
 - **Wobble a tempo**: VCF MOD MIX tutto su LFO, VCF MOD AMT alto, LFO SYNC 1/8 (programma 61).
@@ -227,7 +253,7 @@ l'FM-1 collegato) rifà le misure.
 Tutto è in Ubuntu (WSL) su questo PC, in `~/fm1/fmav1`:
 
 ```
-cd ~/fm1/fmav1 && sh build.sh --release 0.3.1          # -> build/fmav1-0.3.1.fwsc
+cd ~/fm1/fmav1 && sh build.sh --release 0.4            # -> build/fmav1-0.4.fwsc
 OBV_DEFS=-DMFM_NTRK=1u sh build.sh                     # la versione a una traccia
 sh tests/run_tests.sh                                 # tutti i test (sanitizer e fuzz compresi, ~25 min)
 QUICK=1 sh tests/run_tests.sh                         # gli stessi senza i 90 programmi sotto sanitizer (~5 min)

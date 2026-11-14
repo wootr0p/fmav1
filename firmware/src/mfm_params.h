@@ -19,21 +19,23 @@
 
 /* the patchbay: the outputs a cable can take (J_NONE: no cable), the inputs that take one */
 enum { J_NONE, J_VCA, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE, J_ONETWO, J_ATTN, J_MULT1, J_MULT2, J_VELO, J_WHEEL,
-       J_PRESS, J_CLOCK, J_DUMMY, NJSRC };      /* (0.3: J_VCA and the mult no longer offered; CLOCK, DUMMY appended) */
+       J_PRESS, J_CLOCK, J_DUMMY, J_NOISE, NJSRC };   /* (0.3: J_VCA and the mult no longer offered; CLOCK, DUMMY
+                                                 * appended; 0.3.2: NOISE) */
 enum { I_1VOCT, I_PWM, I_CUTOFF, I_VCACV, I_LFORATE, I_GATE, I_FOLD, I_SHIN, I_SHGATE, I_ONE, I_TWO, I_ATTN, I_MULT,
        NJIN };
 static const char *const JSRC_NAME[NJSRC] = {"---", "VCA", "KB CV", "VCO", "LFO", "EG", "S+H", "ONE", "ONE+TWO",
-    "ATTN", "MULT 1", "MULT 2", "VELO", "MODWHL", "PRESS", "CLOCK", "DUMMY"};
+    "ATTN", "MULT 1", "MULT 2", "VELO", "MODWHL", "PRESS", "CLOCK", "DUMMY", "NOISE"};
 /* the order a jack's knob runs through its choices: no cable, the panel's outputs, the clock, the MIDI sources, and
  * last a dummy (a plug on its own: the normal broken, 0 V; 0.3.1, the user: "in fondo all'elenco") */
-static const uint8_t JORDER[] = {J_NONE, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE, J_ONETWO, J_ATTN, J_CLOCK, J_VELO,
-    J_WHEEL, J_PRESS, J_DUMMY};
+static const uint8_t JORDER[] = {J_NONE, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE, J_ONETWO, J_ATTN, J_NOISE, J_CLOCK,
+    J_VELO, J_WHEEL, J_PRESS, J_DUMMY};
 #define NJORDER (sizeof JORDER / sizeof JORDER[0])
-#define JS_EXT(s) ((s) >= J_VELO && (s) <= J_CLOCK)   /* from outside the panel (MIDI): a cable from the edge */
+#define JS_EXT(s) ((s) >= J_VELO && (s) != J_DUMMY)   /* not on the panel (MIDI, the clock, the noise): a cable
+                                                 * from the edge */
 static const char *const JIN_NAME[NJIN] = {"1V/OCT", "PWM", "CUTOFF", "VCA CV", "LFO RT", "GATE", "FOLD IN", "S+H IN",
     "S+H GT", "ONE", "TWO", "ATTN", "MULT"};
 /* an input with no cable: its normal, as the knob shows it */
-static const char *const JIN_NORMAL[NJIN] = {"---", "---", "---", "---", "---", "---", "---", "(VCO)", "(LFO)", "(-5V)",
+static const char *const JIN_NORMAL[NJIN] = {"---", "---", "---", "---", "---", "---", "---", "(NOISE)", "(LFO)", "(-5V)",
     "---", "(+5V)", "---"};
 
 enum {
@@ -53,16 +55,20 @@ enum {
     P_RV_ON, P_RV_SEND, P_RV_DECAY, P_RV_DAMP, P_RV_PRE, P_RV_DIFF, P_RV_WIDTH,
     /* 0.3: the clock (MIDI clock, else TEMPO): the LFO locked to it, a CLOCK output a cable can take */
     P_LFO_SYNC, P_CLK_DIV, P_CLK_WIDTH,
+    /* 0.3.2: white noise (not on the reference panel): its level into the VCF's input, with the VCO (or the folder) */
+    P_NOISE,
     NPARAM
 };
 #define NPARAM_01 45u                           /* 0.1's parameters (its programs: the name at 45; fmav1.c converts them) */
 #define NPARAM_02 66u                           /* 0.2's (its programs: the name at 66; fmav1.c converts them) */
+#define NPARAM_03 69u                           /* 0.3 / 0.3.1's (the name at 69) */
 #define PJ(i) (P_JACK + (i))
 
 #define PATCH_NAME 12u
-#define PATCH_BYTES 96u                         /* NPARAM values, the name at NPARAM, the rest spare (room to append) */
-#if NPARAM + PATCH_NAME > PATCH_BYTES
-#error "the patch outgrew PATCH_BYTES"
+#define PATCH_BYTES 96u                         /* NPARAM values, spare slots (0xFF: not set), the name at the end */
+#define PNAME_AT (PATCH_BYTES - PATCH_NAME)     /* 0.3.2: the name's fixed place (84): new parameters fill the spare slots */
+#if NPARAM > PNAME_AT
+#error "the parameters reached the name"
 #endif
 #define NPROG 99u                               /* (two digits) the factory sounds, then INIT; the user's saves over any */
 
@@ -120,7 +126,7 @@ static const pdef_t PDEF[NPARAM] = {
     [P_ATTN] = {"ATTENUATOR", 127, 0, K_TEN, 0},
     [P_FINE] = {"FINE", 100, 50, K_FINE, 0},
     JACK_DEF(I_1VOCT, "1V/OCT"), JACK_DEF(I_PWM, "PWM"), JACK_DEF(I_CUTOFF, "CUTOFF"), JACK_DEF(I_VCACV, "VCA CV"),
-    JACK_DEF(I_LFORATE, "LFO RATE"), JACK_DEF(I_GATE, "GATE"), JACK_DEF(I_FOLD, "FOLD IN"), JACK_DEF(I_SHIN, "S+H (VCO)"),
+    JACK_DEF(I_LFORATE, "LFO RATE"), JACK_DEF(I_GATE, "GATE"), JACK_DEF(I_FOLD, "FOLD IN"), JACK_DEF(I_SHIN, "S+H (NOISE)"),
     JACK_DEF(I_SHGATE, "S+H GATE"), JACK_DEF(I_ONE, "ONE (-5)"), JACK_DEF(I_TWO, "TWO"), JACK_DEF(I_ATTN, "ATTN (+5)"),
     JACK_DEF(I_MULT, "MULT"),
     [P_PRIO] = {"PRIO", NPR - 1, PR_LOW, K_PRIO, 0},
@@ -155,6 +161,7 @@ static const pdef_t PDEF[NPARAM] = {
     [P_LFO_SYNC] = {"SYNC", NCLKDIV, 0, K_SYNC, 0},   /* 0 FREE (the RATE knob), 1.. a note value of the clock */
     [P_CLK_DIV] = {"CLOCK", NCLKDIV - 1, 11, K_CDIV, 0},   /* 1/8 */
     [P_CLK_WIDTH] = {"GATE", 127, 64, K_PCT, 0},
+    [P_NOISE] = {"NOISE", 127, 0, K_TEN, 0},     /* 0.3.2 */
 };
 /* the INITIAL PATCH above is the manual's (its page 14: VCO WAVE, PULSE WIDTH, both MOD MIXes, CUTOFF, RESONANCE, LFO
  * RATE and WAVE, DECAY, RELEASE at 12 o'clock, SUSTAIN at 2, the rest at 0). 0.1's defaults were others: its factory
@@ -184,6 +191,19 @@ static const uint32_t JIN_DENY[NJIN] = {
 #undef JB
 static int jack_ok(uint32_t in, uint32_t src) { return src < NJSRC && in < NJIN && !(JIN_DENY[in] >> src & 1u); }
 /* a cable an older program has that 0.3 offers no more: from a mult -> from what the mult took; from VCA OUT -> none */
+/* (0.4) S+H IN with no cable takes the white noise; older programs took the VCO: one that uses the S+H with no cable in
+ * S+H IN gets the cable VCO > S+H IN, so it sounds as it did */
+static void patch_keep_sh_vco(uint8_t *v)
+{
+    uint32_t i, uses = 0;
+    for (i = 0; i < NJIN; i++) uses |= v[PJ(i)] == J_SH;
+    if (uses && v[PJ(I_SHIN)] == J_NONE) v[PJ(I_SHIN)] = J_VCO;
+}
+static void patch_fix_values(uint8_t *v)      /* (0.3.2) a value out of its range (a slot not set: 0xFF) -> its default */
+{
+    uint32_t i;
+    for (i = 0; i < NPARAM; i++) if (v[i] > PDEF[i].max) v[i] = PDEF[i].def;
+}
 static void patch_fix_jacks(uint8_t *v)
 {
     uint32_t i, m = v[PJ(I_MULT)];
@@ -201,8 +221,9 @@ static void patch_defaults(patch_t *p)
 {
     uint32_t i;
     for (i = 0; i < NPARAM; i++) p->v[i] = PDEF[i].def;
+    for (; i < PNAME_AT; i++) p->v[i] = 0xFFu;  /* (spare: a parameter added later reads "not set") */
     for (; i < PATCH_BYTES; i++) p->v[i] = ' ';
-    p->v[NPARAM + 0] = 'I'; p->v[NPARAM + 1] = 'N'; p->v[NPARAM + 2] = 'I'; p->v[NPARAM + 3] = 'T';
+    p->v[PNAME_AT + 0] = 'I'; p->v[PNAME_AT + 1] = 'N'; p->v[PNAME_AT + 2] = 'I'; p->v[PNAME_AT + 3] = 'T';
 }
 
 /* a factory patch: a name and a list of (parameter, value) pairs over the defaults, ended by 255 */
@@ -214,6 +235,6 @@ static void patch_from_factory(patch_t *p, const factory_t *f)
     patch_defaults(p);
     for (i = 0; FACT_BASE_01[i] != 255u; i += 2) p->v[FACT_BASE_01[i]] = FACT_BASE_01[i + 1];
     while (s[0] != 255u) { p->v[s[0]] = s[1]; s += 2; }
-    for (i = 0; i < PATCH_NAME; i++) p->v[NPARAM + i] = ' ';
-    for (i = 0; i < PATCH_NAME && f->name[i]; i++) p->v[NPARAM + i] = (uint8_t)f->name[i];
+    for (i = 0; i < PATCH_NAME; i++) p->v[PNAME_AT + i] = ' ';
+    for (i = 0; i < PATCH_NAME && f->name[i]; i++) p->v[PNAME_AT + i] = (uint8_t)f->name[i];
 }

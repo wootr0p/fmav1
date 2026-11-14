@@ -71,8 +71,9 @@ folds at 5 / 15 / 25 V, rounded peaks, 2x oversampled).
 
 - `firmware/src/fmav1.c`: the app (sections and items with per-page subtitles and graphs; virtual knobs `V_*`, value
   formatting `param_value`, MIDI in with the clock, storage, drawing what changed, the LEDs).
-- `mfm_params.h`: the parameter table (69 + a 12-character name in a 96-byte patch; 0.1 had 45, 0.2 66: their saved
-  programs are converted by `patch_from_01` / `patch_from_02`, sector tag "MFMP" / "MFM2" -> "MFM3"). **The order is the
+- `mfm_params.h`: the parameter table (70 in a 96-byte patch, the 12-character name at its fixed place `PNAME_AT` = 84,
+  spare slots 0xFF = not set -> the default: append parameters up to 84 with no conversion; 0.1 / 0.2 / 0.3 had the name
+  after 45 / 66 / 69 parameters: `patch_from_01/02/03`, tags "MFMP" / "MFM2" / "MFM3" -> "MFM4"). **The order is the
   MIDI CC order** (CC 20 up, skipping 64, 71-75, 91-93, 98, 99) and the NRPN number: append new parameters at the end.
   The jacks `P_JACK + I_*` hold a source `J_*` (0 = no cable; `JORDER` the knob's order: ---, the panel's, CLOCK, the MIDI
   ones, DUMMY last), never one `JIN_DENY` refuses. I_MULT stays as a dead slot (the CC numbers keep their meaning).
@@ -128,6 +129,11 @@ must be in time order and at most ~60 MIDI messages a millisecond; nothing befor
   the user (the hub's check then passed but for fmhub.json "kinds", fixed); the hub form in progress.
 - 0.3.1 (2026-11-14): DUMMY last in JORDER; MIDI CH 1 by default; SEQ = two items (PATCHBAY, INPUTS: SEQ again
   switches); SAVE held lights F3 / G3 / A3, EDIT held lights OCT- / OCT+. Sound bit-identical to 0.3.
+- 0.4 (2026-11-14): white noise (P_NOISE level into the VCF input, J_NOISE output, per-track xorshift, run only when
+  heard; `noise_one` draws one for the S+H's normal); S+H IN normalled to NOISE (`patch_keep_sh_vco` for older saves);
+  no knob twice but PERFORM (cables only on SEQ, UTL one page, TEMPO only GLOBAL, no S+H page); a section's button again
+  = SELECT +1 (ARP again: toggle); the name at PNAME_AT 84, spare slots 0xFF (`patch_fix_values`), tag "MFM4"; 18
+  programs remade with the noise (the other 72 bit-identical to 0.3.1, each rendered alone).
 - **Always: the user flashes and tries a build on the FM-1 before any push, release or hub update** (the user, 0.3.1).
 
 ## Style

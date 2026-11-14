@@ -77,7 +77,8 @@ static void lights_apply(void)
 }
 
 #define PS_N 40u                                /* programs a sector */
-#define PS_TAG 0x334D464Du                      /* "MFM3": 0.3's layout (the clock appended) */
+#define PS_TAG 0x344D464Du                      /* "MFM4": 0.3.2's layout (the name at PNAME_AT, spare slots 0xFF) */
+#define PS_TAG_03 0x334D464Du                   /* "MFM3": 0.3 / 0.3.1's (patch_from_03) */
 #define PS_TAG_02 0x324D464Du                   /* "MFM2": 0.2's (patch_from_02) */
 #define PS_TAG_01 0x504D464Du                   /* "MFMP": 0.1's (patch_from_01) */
 typedef struct { uint32_t tag, used[2]; patch_t p[PS_N]; } psect_t;
@@ -94,7 +95,8 @@ static void patch_from_01(patch_t *p)
     uint32_t i;
     patch_defaults(&q);
     for (i = 0; i < NPARAM_01; i++) q.v[i] = p->v[i];
-    for (i = 0; i < PATCH_NAME; i++) q.v[NPARAM + i] = p->v[NPARAM_01 + i];
+    for (i = 0; i < PATCH_NAME; i++) q.v[PNAME_AT + i] = p->v[NPARAM_01 + i];
+    patch_keep_sh_vco(q.v);                     /* (0.4: the S+H's normal is the noise now) */
     *p = q;
 }
 /* a program saved by 0.2: its 66 parameters, the clock's at their defaults, the name moved from 66 to NPARAM */
@@ -104,7 +106,19 @@ static void patch_from_02(patch_t *p)
     uint32_t i;
     patch_defaults(&q);
     for (i = 0; i < NPARAM_02; i++) q.v[i] = p->v[i];
-    for (i = 0; i < PATCH_NAME; i++) q.v[NPARAM + i] = p->v[NPARAM_02 + i];
+    for (i = 0; i < PATCH_NAME; i++) q.v[PNAME_AT + i] = p->v[NPARAM_02 + i];
+    patch_keep_sh_vco(q.v);                     /* (0.4: the S+H's normal is the noise now) */
+    *p = q;
+}
+/* a program saved by 0.3 / 0.3.1: its 69 parameters, the noise off, the name moved from 69 to its fixed place */
+static void patch_from_03(patch_t *p)
+{
+    patch_t q;
+    uint32_t i;
+    patch_defaults(&q);
+    for (i = 0; i < NPARAM_03; i++) q.v[i] = p->v[i];
+    for (i = 0; i < PATCH_NAME; i++) q.v[PNAME_AT + i] = p->v[NPARAM_03 + i];
+    patch_keep_sh_vco(q.v);                     /* (0.4: the S+H's normal is the noise now) */
     *p = q;
 }
 static int prog_used(uint32_t n) { return (int)(psect[n / PS_N].used[(n % PS_N) >> 5] >> (n % 32u) & 1u); }
@@ -114,6 +128,7 @@ static void prog_get(uint32_t n, patch_t *p)    /* program n: the user's, else t
     if (prog_used(n)) *p = psect[n / PS_N].p[n % PS_N];
     else if (n < NFACT) patch_from_factory(p, &FACTORY[n]);
     else patch_defaults(p);
+    patch_fix_values(p->v);                     /* (0.3.2: a slot not set, a value out of range: the default) */
     patch_fix_jacks(p->v);                      /* (0.3: a cable from the mult or VCA OUT) */
 }
 static void prog_put(uint32_t n, const patch_t *p)
@@ -166,26 +181,23 @@ static const item_t IT_PERF[] = {
     {"MIXER", 1, AC_PERF, TAB_NONE, {G_TRACKS}, {0}, {{V_LVL1, V_PAN1, NONE, NONE}}, "THE TRACK'S|LEVEL AND PAN"},
 #endif
 };
+/* (0.4, the user: no knob twice but on PERFORM) the cables only on SEQ, TEMPO only on GLOBAL */
 static const item_t IT_EDIT[] = {
-    {"VCO", 3, AC_VCO, TAB_VCO, {G_VCO, G_VMOD, G_PATCH}, {0, "MOD", "INPUTS"},
-        {{P_PITCH, P_WAVE, P_PW, P_FINE}, {P_VCO_MIX, P_PITCH_AMT, P_PWM_AMT, NONE}, {PJ(I_1VOCT), PJ(I_PWM), NONE, NONE}},
+    {"VCO", 2, AC_VCO, TAB_VCO, {G_VCO, G_VMOD}, {0, "MOD"},
+        {{P_PITCH, P_WAVE, P_PW, P_FINE}, {P_VCO_MIX, P_PITCH_AMT, P_PWM_AMT, NONE}},
         "WAVE: SAW >|MIX > PULSE"},
-    {"VCF", 2, AC_VCF, TAB_VCF, {G_VCF, G_PATCH}, {"LADDER", "INPUTS"},
-        {{P_CUTOFF, P_RES, P_VCF_MIX, P_VCF_AMT}, {PJ(I_CUTOFF), PJ(I_FOLD), P_FOLD, NONE}},
-        "KB CV > CUTOFF:|KEY TRACKING"},
+    {"VCF", 1, AC_VCF, TAB_VCF, {G_VCF}, {"LADDER"},
+        {{P_CUTOFF, P_RES, P_VCF_MIX, P_VCF_AMT}},
+        "KEY TRACKING: SEQ|KB CV > CUTOFF"},
 };
 static const item_t IT_ENV[] = {
-    {"EG", 2, AC_ENV, TAB_EG, {G_EG, G_PATCH}, {"ADSR", "INPUTS"},
-        {{P_ATTACK, P_DECAY, P_SUSTAIN, P_RELEASE}, {PJ(I_GATE), NONE, NONE, NONE}}, "THE EG OPENS|THE VCA"},
-    {"VCA", 1, AC_ENV, TAB_VCA, {G_VCA}, {0}, {{P_VOLUME, P_VCA_MODE, PJ(I_VCACV), NONE}},
-        "MODE ON:|A DRONE"},
+    {"EG", 1, AC_ENV, TAB_EG, {G_EG}, {"ADSR"}, {{P_ATTACK, P_DECAY, P_SUSTAIN, P_RELEASE}}, "THE EG OPENS|THE VCA"},
+    {"VCA", 1, AC_ENV, TAB_VCA, {G_VCA}, {0}, {{P_VOLUME, P_VCA_MODE, NONE, NONE}}, "MODE ON:|A DRONE"},
 };
 static const item_t IT_LFO[] = {
-    {"LFO", 1, AC_LFO, TAB_LFO, {G_LFO}, {0}, {{P_LFO_RATE, P_LFO_WAVE, PJ(I_LFORATE), P_LFO_SYNC}},
+    {"LFO", 1, AC_LFO, TAB_LFO, {G_LFO}, {0}, {{P_LFO_RATE, P_LFO_WAVE, P_LFO_SYNC, NONE}},
         "SYNC: LOCKED|TO THE CLOCK"},
-    {"S+H", 1, AC_LFO, TAB_UTL, {G_SH}, {"SAMPLE + HOLD"}, {{PJ(I_SHIN), PJ(I_SHGATE), NONE, NONE}},
-        "NO CABLES: THE|VCO BY THE LFO"},
-    {"CLOCK", 1, AC_LFO, TAB_LFO, {G_CLK}, {"MIDI / TEMPO"}, {{P_CLK_DIV, P_CLK_WIDTH, V_TEMPO, NONE}},
+    {"CLOCK", 1, AC_LFO, TAB_LFO, {G_CLK}, {"MIDI / TEMPO"}, {{P_CLK_DIV, P_CLK_WIDTH, NONE, NONE}},
         "PATCH CLOCK|INTO ANY INPUT"},
 };
 static const item_t IT_PATCH[] = {             /* SEQ (0.3.1: two items, SEQ again switches): the whole patchbay; its 12
@@ -194,15 +206,12 @@ static const item_t IT_PATCH[] = {             /* SEQ (0.3.1: two items, SEQ aga
     {"INPUTS", 3, AC_JACK, TAB_JACK, {G_PATCH, G_PATCH, G_PATCH}, {"1-4", "5-8", "9-12"},
         {{PJ(I_FOLD), PJ(I_1VOCT), PJ(I_PWM), PJ(I_ONE)}, {PJ(I_LFORATE), PJ(I_CUTOFF), PJ(I_GATE), PJ(I_VCACV)},
          {PJ(I_TWO), PJ(I_SHIN), PJ(I_SHGATE), PJ(I_ATTN)}},
-        "SEQ AGAIN:|ALL CABLES"},
+        "SEQ AGAIN:|NEXT PAGE"},
 };
-static const item_t IT_UTL[] = {               /* SELECT pressed (0.3): the utilities the manual calls the patchbay's */
-    {"WAVE FOLDER", 1, AC_UTL, TAB_UTL, {G_FOLD}, {0}, {{P_FOLD, PJ(I_FOLD), NONE, NONE}},
-        "VCO > FOLD IN:|IT FOLDS"},
-    {"MIXER", 1, AC_UTL, TAB_UTL, {G_UMIX}, {"ONE + TWO"}, {{P_ONE_LVL, PJ(I_ONE), PJ(I_TWO), NONE}},
-        "NO CABLE IN|ONE: -5 V"},
-    {"ATTENUATOR", 1, AC_UTL, TAB_UTL, {G_ATTN}, {0}, {{P_ATTN, PJ(I_ATTN), NONE, NONE}},
-        "NO CABLE IN|ATTN: +5 V"},
+static const item_t IT_UTL[] = {               /* SELECT pressed (0.3): the utilities' levels (0.4: one page, the noise's
+                                                 * too; their cables on SEQ) */
+    {"UTILITIES", 1, AC_UTL, TAB_UTL, {G_FOLD}, {0}, {{P_FOLD, P_ONE_LVL, P_ATTN, P_NOISE}},
+        "CABLES: SEQ|VCO > FOLD IN"},
 };
 static const item_t IT_FX[] = {                 /* FX: the chorus, the delay and the reverb (shared, a send each) */
     {"CHORUS", 2, AC_FX, TAB_FX, {G_CHO, G_CHO}, {0, 0}, {{P_CH_ON, P_CH_TYPE, P_CH_MIX, NONE}, {P_CH_RATE, P_CH_DEPTH, NONE, NONE}},
@@ -224,8 +233,8 @@ static const item_t IT_GLO[] = {
 enum { S_PERF, S_EDIT, S_ENV, S_LFO, S_FX, S_PATCH, S_ARP, S_GLO, S_UTL, NSEC };
 typedef struct { const item_t *it; uint8_t n, btn; } section_t;
 static const section_t SEC[NSEC] = {
-    {IT_PERF, 2, BTN_HOME}, {IT_EDIT, 2, BTN_EDIT}, {IT_ENV, 2, BTN_ENV}, {IT_LFO, 3, BTN_LFO}, {IT_FX, 3, BTN_FX},
-    {IT_PATCH, 2, BTN_SEQ}, {IT_ARP, 1, BTN_ARP}, {IT_GLO, 3, BTN_GLO}, {IT_UTL, 3, BTN_SEL},
+    {IT_PERF, 2, BTN_HOME}, {IT_EDIT, 2, BTN_EDIT}, {IT_ENV, 2, BTN_ENV}, {IT_LFO, 2, BTN_LFO}, {IT_FX, 3, BTN_FX},
+    {IT_PATCH, 2, BTN_SEQ}, {IT_ARP, 1, BTN_ARP}, {IT_GLO, 3, BTN_GLO}, {IT_UTL, 1, BTN_SEL},
 };
 static uint32_t sec = S_PERF, sec_item[NSEC], item_pg[NSEC][8];
 
@@ -489,8 +498,8 @@ static uint32_t rn(uint32_t lo, uint32_t hi) { return lo + xorshift(&rnd_ui) % (
 static void name_as(const char *nm)
 {
     uint32_t i;
-    for (i = 0; i < PATCH_NAME; i++) live.v[NPARAM + i] = ' ';
-    for (i = 0; i < PATCH_NAME && nm[i]; i++) live.v[NPARAM + i] = (uint8_t)nm[i];
+    for (i = 0; i < PATCH_NAME; i++) live.v[PNAME_AT + i] = ' ';
+    for (i = 0; i < PATCH_NAME && nm[i]; i++) live.v[PNAME_AT + i] = (uint8_t)nm[i];
 }
 /* a new sound, within reason: always something to hear; sometimes a cable or two of the classic patches */
 static void randomize_patch(void)
@@ -764,9 +773,9 @@ static void draw_header(void)                   /* the top strip and the program
     if (save_armed) {
         msg[0] = 0; scat(msg, "SAVE TO ");
         fmt_u(msg + slen(msg), save_to % NPROG + 1u); scat(msg, "?");
-        ui_prog(save_to % NPROG, live.v + NPARAM, edited[t], tags, msg, t);
+        ui_prog(save_to % NPROG, live.v + PNAME_AT, edited[t], tags, msg, t);
     } else
-        ui_prog(set.tprog[t], live.v + NPARAM, edited[t], tags, 0, t);
+        ui_prog(set.tprog[t], live.v + PNAME_AT, edited[t], tags, 0, t);
 }
 static void knob_view(knob_view_t *kv, uint32_t k)
 {
@@ -832,7 +841,7 @@ static void draw_page(void)
         static const uint8_t ON[3] = {P_CH_ON, P_DL_ON, P_RV_ON};
         sub = set.fx_off ? "OFF (REC)" : live.v[ON[sec_item[S_FX] % 3u]] ? "ON" : "OFF";
     }
-    if (sec == S_LFO && sec_item[S_LFO] % 3u == 2u) sub = ctl_ext_quarter ? (ctl_clk_run ? "MIDI CLOCK" : "MIDI (STOPPED)") : "TEMPO";
+    if (sec == S_LFO && sec_item[S_LFO] % 2u == 1u) sub = ctl_ext_quarter ? (ctl_clk_run ? "MIDI CLOCK" : "MIDI (STOPPED)") : "TEMPO";
     if (sec == S_ARP) sub = ARP_NAME[live.v[P_ARP_MODE] % NAR];
     for (k = 0; k < 4u; k++) knob_view(&kv[k], k);
     page_map(&pm);
@@ -937,11 +946,13 @@ static void animate(void)
 /* ---- buttons */
 /* The panel (the user's rule): a section's button opens it, SELECT turned runs through ALL its pages
  * (every item's, one after the other), the four knobs are the page's; SELECT pressed is the UTL section's button (0.3).
- * Nothing else is needed to edit (the button pressed again still jumps to the next item, a shortcut no one has to
- * know). */
-static void go_section(uint32_t s)              /* a section's button: there, or (already there) its next item */
+ * Nothing else is needed to edit; the section's button pressed again turns to its next page, as SELECT (0.4; ARP again:
+ * the arp on / off, its section has one page). */
+static void select_turn(int32_t e);
+static void go_section(uint32_t s)              /* a section's button: there, or (already there, 0.4) its next page, as
+                                                 * SELECT turned one detent */
 {
-    if (sec == s) sec_item[s] = (sec_item[s] + 1u) % SEC[s].n;
+    if (sec == s) { select_turn(1); return; }
     sec = s;
     dirty_page = dirty_map = dirty_hdr = 1;
 }
@@ -1061,7 +1072,7 @@ static void trk_select(uint32_t t)              /* ALGORITHM (several tracks): t
     set.trk = (uint8_t)t; set_dirty = 1; set_t = fm1_ms;
     save_armed = 0;
     toast_buf[0] = 0; scat(toast_buf, "TRACK "); fmt_u(toast_buf + slen(toast_buf), t + 1u); scat(toast_buf, ": ");
-    for (i = 0; i < PATCH_NAME; i++) { toast_buf[slen(toast_buf) + 1u] = 0; toast_buf[slen(toast_buf)] = (char)live.v[NPARAM + i]; }
+    for (i = 0; i < PATCH_NAME; i++) { toast_buf[slen(toast_buf) + 1u] = 0; toast_buf[slen(toast_buf)] = (char)live.v[PNAME_AT + i]; }
     while (slen(toast_buf) && toast_buf[slen(toast_buf) - 1u] == ' ') toast_buf[slen(toast_buf) - 1u] = 0;
     say(toast_buf);
     dirty_hdr = dirty_page = dirty_map = dirty_graph = 1;
@@ -1166,14 +1177,15 @@ static void app_main(void)
     cc_map_init();
     for (i = 0; i < NPSECT; i++)
         if (psect_load(i, &psect[i], sizeof psect[i])
-            || (psect[i].tag != PS_TAG && psect[i].tag != PS_TAG_02 && psect[i].tag != PS_TAG_01)) {
+            || (psect[i].tag != PS_TAG && psect[i].tag != PS_TAG_03 && psect[i].tag != PS_TAG_02 && psect[i].tag != PS_TAG_01)) {
             memset(&psect[i], 0, sizeof psect[i]); psect[i].tag = PS_TAG;
-        } else if (psect[i].tag != PS_TAG) {    /* (0.1's, 0.2's: converted here, written so with the sector's next save) */
+        } else if (psect[i].tag != PS_TAG) {    /* (0.1's .. 0.3.1's: converted here, written so with the sector's next save) */
             uint32_t j;
             for (j = 0; j < PS_N; j++)
                 if (psect[i].used[j >> 5] >> (j & 31u) & 1u) {
                     if (psect[i].tag == PS_TAG_01) patch_from_01(&psect[i].p[j]);
-                    else patch_from_02(&psect[i].p[j]);
+                    else if (psect[i].tag == PS_TAG_02) patch_from_02(&psect[i].p[j]);
+                    else patch_from_03(&psect[i].p[j]);
                 }
             psect[i].tag = PS_TAG;
         }
