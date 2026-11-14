@@ -24,10 +24,10 @@ enum { I_1VOCT, I_PWM, I_CUTOFF, I_VCACV, I_LFORATE, I_GATE, I_FOLD, I_SHIN, I_S
        NJIN };
 static const char *const JSRC_NAME[NJSRC] = {"---", "VCA", "KB CV", "VCO", "LFO", "EG", "S+H", "ONE", "ONE+TWO",
     "ATTN", "MULT 1", "MULT 2", "VELO", "MODWHL", "PRESS", "CLOCK", "DUMMY"};
-/* the order a jack's knob runs through its choices: no cable, a dummy (a plug on its own: the normal broken, 0 V),
- * the panel's outputs, the clock, the MIDI sources */
-static const uint8_t JORDER[] = {J_NONE, J_DUMMY, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE, J_ONETWO, J_ATTN, J_CLOCK,
-    J_VELO, J_WHEEL, J_PRESS};
+/* the order a jack's knob runs through its choices: no cable, the panel's outputs, the clock, the MIDI sources, and
+ * last a dummy (a plug on its own: the normal broken, 0 V; 0.3.1, the user: "in fondo all'elenco") */
+static const uint8_t JORDER[] = {J_NONE, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE, J_ONETWO, J_ATTN, J_CLOCK, J_VELO,
+    J_WHEEL, J_PRESS, J_DUMMY};
 #define NJORDER (sizeof JORDER / sizeof JORDER[0])
 #define JS_EXT(s) ((s) >= J_VELO && (s) <= J_CLOCK)   /* from outside the panel (MIDI): a cable from the edge */
 static const char *const JIN_NAME[NJIN] = {"1V/OCT", "PWM", "CUTOFF", "VCA CV", "LFO RT", "GATE", "FOLD IN", "S+H IN",

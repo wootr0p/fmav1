@@ -188,11 +188,13 @@ static const item_t IT_LFO[] = {
     {"CLOCK", 1, AC_LFO, TAB_LFO, {G_CLK}, {"MIDI / TEMPO"}, {{P_CLK_DIV, P_CLK_WIDTH, V_TEMPO, NONE}},
         "PATCH CLOCK|INTO ANY INPUT"},
 };
-static const item_t IT_PATCH[] = {             /* SEQ: the whole patchbay, then its 12 inputs in the panel's order */
-    {"PATCHBAY", 4, AC_JACK, TAB_JACK, {G_PATCH, G_PATCH, G_PATCH, G_PATCH}, {"ALL CABLES", "INPUTS 1", "INPUTS 2", "INPUTS 3"},
-        {{NONE, NONE, NONE, NONE}, {PJ(I_FOLD), PJ(I_1VOCT), PJ(I_PWM), PJ(I_ONE)}, {PJ(I_LFORATE), PJ(I_CUTOFF), PJ(I_GATE), PJ(I_VCACV)},
+static const item_t IT_PATCH[] = {             /* SEQ (0.3.1: two items, SEQ again switches): the whole patchbay; its 12
+                                                 * inputs on knobs, in the panel's order */
+    {"PATCHBAY", 1, AC_JACK, TAB_JACK, {G_PATCH}, {"ALL CABLES"}, {{NONE, NONE, NONE, NONE}}, "SEQ AGAIN:|THE INPUTS"},
+    {"INPUTS", 3, AC_JACK, TAB_JACK, {G_PATCH, G_PATCH, G_PATCH}, {"1-4", "5-8", "9-12"},
+        {{PJ(I_FOLD), PJ(I_1VOCT), PJ(I_PWM), PJ(I_ONE)}, {PJ(I_LFORATE), PJ(I_CUTOFF), PJ(I_GATE), PJ(I_VCACV)},
          {PJ(I_TWO), PJ(I_SHIN), PJ(I_SHGATE), PJ(I_ATTN)}},
-        "TURN SELECT:|THE CABLES"},
+        "SEQ AGAIN:|ALL CABLES"},
 };
 static const item_t IT_UTL[] = {               /* SELECT pressed (0.3): the utilities the manual calls the patchbay's */
     {"WAVE FOLDER", 1, AC_UTL, TAB_UTL, {G_FOLD}, {0}, {{P_FOLD, PJ(I_FOLD), NONE, NONE}},
@@ -223,7 +225,7 @@ enum { S_PERF, S_EDIT, S_ENV, S_LFO, S_FX, S_PATCH, S_ARP, S_GLO, S_UTL, NSEC };
 typedef struct { const item_t *it; uint8_t n, btn; } section_t;
 static const section_t SEC[NSEC] = {
     {IT_PERF, 2, BTN_HOME}, {IT_EDIT, 2, BTN_EDIT}, {IT_ENV, 2, BTN_ENV}, {IT_LFO, 3, BTN_LFO}, {IT_FX, 3, BTN_FX},
-    {IT_PATCH, 1, BTN_SEQ}, {IT_ARP, 1, BTN_ARP}, {IT_GLO, 3, BTN_GLO}, {IT_UTL, 3, BTN_SEL},
+    {IT_PATCH, 2, BTN_SEQ}, {IT_ARP, 1, BTN_ARP}, {IT_GLO, 3, BTN_GLO}, {IT_UTL, 3, BTN_SEL},
 };
 static uint32_t sec = S_PERF, sec_item[NSEC], item_pg[NSEC][8];
 
@@ -712,7 +714,7 @@ static uint16_t acc_colour(const item_t *it)
     return AC[it->acc % 9u];
 }
 static uint32_t cur_graph(void) { const item_t *it = cur_item(); return it->gr[cur_pg() % 5u]; }
-static int on_patchbay(void) { return sec == S_PATCH && cur_pg() == 0u; }   /* (SEQ's first page: the whole patchbay) */
+static int on_patchbay(void) { return sec == S_PATCH && sec_item[S_PATCH] % 2u == 0u; }   /* (SEQ's first item: the whole patchbay) */
 static const char *tab_text(const item_t *it)   /* the box's tab: the module, as the panel prints it */
 {
     static const char *const TT[NTAB] = {"VCO", "VCF", "EG", "VCA", "LFO", "UTL", "PATCH", "FX"};
@@ -1124,6 +1126,9 @@ static void leds(void)
     if (live.v[P_ARP_MODE]) on |= 1u << BTN_ARP;
     if (save_armed && (fm1_ms / 250u & 1u)) on |= 1u << BTN_SAVE;
     if (n >= 0 && n < 27) keys = 1u << n;
+    if (layer_btn == BTN_SAVE) keys = 1u << 0 | 1u << 2 | 1u << 4;   /* (0.3.1) SAVE held: F3 INIT, G3 RANDOM, A3 MUTATE lit */
+    if ((fm1_in.buttons >> BTN_EDIT & 1u) && undo_ok)   /* (0.3.1) EDIT held: OCT- / OCT+ lit (undo / redo) */
+        on |= 1u << BTN_OCT_DOWN | 1u << BTN_OCT_UP;
     if (on != was) {
         for (i = 0; i < 14u; i++) if ((on ^ was) >> i & 1u) fm1_led_key(i, (int)(on >> i & 1u));
         was = on;
@@ -1176,6 +1181,7 @@ static void app_main(void)
         || set.version != SET_VERSION) {
         memset(&set, 0, sizeof set);
         set.magic = SET_MAGIC; set.version = SET_VERSION; set.tempo = 120; set.kvel = 100;
+        set.midi_ch = 1;                        /* (0.3.1, the user: channel 1 at first, tracks 1-4 on channels 1-4) */
         for (i = 0; i < NTRK; i++) { set.tprog[i] = TPROG_DEF[i & 3u]; set.lvl[i] = NTRK > 1u ? 80 : 100; }
     }
     if (set.trk >= NTRK) set.trk = 0;
@@ -1188,7 +1194,7 @@ static void app_main(void)
     }
     if (set.tempo < 40u || set.tempo > 240u) set.tempo = 120;
     if (set.oct < -3 || set.oct > 3) set.oct = 0;
-    if (set.midi_ch > 16u) set.midi_ch = 0;
+    if (set.midi_ch > 16u) set.midi_ch = 1;
     if (set.tune < -50 || set.tune > 50) set.tune = 0;
     if (!set.kvel || set.kvel > 127u) set.kvel = 100;
     if (set.lights > 11u) set.lights = 0;

@@ -14,6 +14,7 @@ cc -Ifirmware/src -Ifirmware/gen -o build/nrpn tools/nrpn.c && build/nrpn > buil
 for s in 1 2 3 4; do python3 tools/fuzz_script.py $s > "$OUT/fuzz$s.txt"; done
 for t in "" tests/*.txt "$OUT"/fuzz*.txt; do
     n=$(basename "${t:-default}" .txt)
+    [ -n "$QUICK" ] && [ "$n" = mfm_programs ] && continue   # (QUICK=1: not the 90 programs, ~10 min under the sanitizers)
     if ! ASAN_OPTIONS=detect_leaks=0 "$OUT/sfm" "$OUT/san-$n" $t >"$OUT/san-$n.log" 2>&1 \
        || grep -qE "runtime error|AddressSanitizer" "$OUT/san-$n.log"; then
         echo "FAIL $n:"; grep -m3 -E "runtime error|AddressSanitizer" "$OUT/san-$n.log"; fail=1

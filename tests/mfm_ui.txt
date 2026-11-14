@@ -27,11 +27,12 @@
 4600 shot
 4700 btn 11
 4900 shot
-5000 enc 0 1
+5000 btn 11
 5100 enc 2 3
 5200 enc 3 1
+5250 enc 5 20
 5400 shot
-5500 enc 0 -1
+5500 btn 11
 5700 shot
 5800 btn 3
 5900 enc 2 40

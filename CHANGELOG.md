@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 (2026-11-14)
+
+- **DUMMY** last in every input's list (after the MIDI sources).
+- **MIDI channel 1** by default (tracks 1-4 on channels 1-4) on a fresh start; a saved channel stays.
+- **SEQ** has two items: **PATCHBAY** (every cable) and **INPUTS** (the 12 inputs on knobs, 3 pages); SEQ pressed again
+  switches between them.
+- The keys a held combination can press are lit: SAVE held lights F3 / G3 / A3 (INIT, RANDOM, MUTATE), EDIT held lights
+  OCT- / OCT+ (undo / redo).
+- The sound is unchanged: the 90 programs render bit-identical to 0.3.
+
 ## 0.3 (2026-11-13): FMav-1
 
 - The name: **FMav-1**, identity **FM-1_3628** (0.1-0.2 had a working name and FM-1_988, which is another

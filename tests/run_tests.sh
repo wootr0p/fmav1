@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-only
 # FMav-1's host tests (no hardware). Run from the repo root after ./build.sh:
-#   sh build.sh && sh tests/run_tests.sh
+#   sh build.sh && sh tests/run_tests.sh      (~25 min; QUICK=1: ~8 min, the sanitizers skip the 90 programs)
 # The app on the host (every factory program, every page, the panel's switches, four tracks, the CPU worst case), the
 # sanitizers with a fuzz, the platform pieces kept from OberVave (MASTER glide, CPU meter), the update path (ota.c, the
 # loader, tools/fm1_install.py).

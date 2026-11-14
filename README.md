@@ -35,7 +35,7 @@ the changes [CHANGELOG.md](CHANGELOG.md).
 From The Firmware Hub (one click, Chrome / Edge), or with the installer from a release:
 
 ```sh
-python3 tools/fm1_install.py fmav1-0.3.fwsc --yes      # FM-1 on USB, switched on
+python3 tools/fm1_install.py fmav1-0.3.1.fwsc --yes    # FM-1 on USB, switched on
 ```
 
 It installs over most FM-1 firmwares (Felucca, SLOOP, OberVave and their forks) and keeps their stored programs
@@ -45,10 +45,11 @@ the installer again.
 ## Build
 
 ```sh
-sh build.sh --release 0.3                              # build/fmav1-0.3.fwsc
+sh build.sh --release 0.3.1                            # build/fmav1-0.3.1.fwsc
 OBV_DEFS=-DMFM_NTRK=1u sh build.sh                     # the one-track build
 sh tests/run_host.sh tests/mfm_programs.txt programs   # on a computer: build/host/programs.wav and the screens
-sh tests/run_tests.sh                                  # every host test, sanitizers and a parameter fuzz
+sh tests/run_tests.sh                                  # every host test, sanitizers and a parameter fuzz (~25 min)
+QUICK=1 sh tests/run_tests.sh                          # the same, the 90 programs not under the sanitizers (~5 min)
 ```
 
 The JieLi toolchain (`tools/get_toolchain.sh`) and the AC79 SDK are needed for the device build; the host tests need

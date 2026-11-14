@@ -1,4 +1,4 @@
-# FMav-1 0.3 per M-VAVE FM-1
+# FMav-1 0.3.1 per M-VAVE FM-1
 
 Un **sintetizzatore monofonico semi-modulare** dentro l'FM-1, ricostruito controllo per controllo e presa per presa dal
 manuale d'uso del suo strumento di riferimento: un **VCO** (dente di sega → impulso, PULSE WIDTH, PWM), un **filtro
@@ -17,6 +17,17 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
 
+## Novità della 0.3.1
+
+- **DUMMY è in fondo all'elenco** di ogni ingresso (dopo le sorgenti MIDI), non più subito dopo `---`.
+- **Canale MIDI 1 di serie**: alla prima accensione (o dopo un altro firmware, che azzera le impostazioni globali) la
+  traccia 1 è sul canale 1, la 2 sul 2, la 3 sul 3, la 4 sul 4. Un canale già impostato resta quello.
+- **SEQ ha due voci**: **PATCHBAY** (tutti i cavi) e **INPUTS** (gli ingressi sulle manopole, 3 pagine). **SEQ premuto
+  di nuovo passa dall'una all'altra**; SELECT girato le scorre tutte, come sempre.
+- **Le combinazioni si illuminano**: con **SAVE tenuto** si accendono i tasti **F3, G3, A3** della tastiera (INIT,
+  RANDOM, MUTATE); con **EDIT tenuto** si accendono **OCT- e OCT+** (undo / redo), se c'è qualcosa da annullare.
+- Il suono non cambia: i 90 programmi sono identici alla 0.3 (provato campione per campione).
+
 ## Novità della 0.3
 
 - **REC accende e spegne tutti gli effetti insieme.** REC acceso = gli effetti suonano come li hai impostati; REC spento
@@ -32,7 +43,7 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
   - **L'arpeggiatore** con un clock MIDI scatta sulla griglia del clock (la prima nota subito).
   - Senza clock MIDI tutto segue il **TEMPO** (GLO → GLOBAL). Il delay era già a tempo.
 - **Il cavo DUMMY**: una spina infilata da sola, senza niente dall'altra parte. Come sul pannello vero, **toglie la
-  normalizzazione** e dà 0 V. Un solo scatto dopo `---` su ogni ingresso. Per esempio: DUMMY in **FOLD IN** = il VCF
+  normalizzazione** e dà 0 V. In fondo all'elenco di ogni ingresso (0.3.1). Per esempio: DUMMY in **FOLD IN** = il VCF
   non riceve niente (il filtro che auto-oscilla da solo, programma 52 WHISTLE); DUMMY in **ONE** = il mixer senza i
   -5 V; DUMMY in **S+H (VCO)** = il S+H fermo a 0 V.
 - **Il MULT non c'è più** (1 ingresso e 2 uscite inutili: un'uscita va già a quante prese vuoi), e **VCA OUT non si
@@ -60,7 +71,7 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 2. Da questa cartella:
 
    ```
-   py fm1_install.py fmav1-0.3.fwsc --yes
+   py fm1_install.py fmav1-0.3.1.fwsc --yes
    ```
 
    Per vedere cosa c'è installato: `py fm1_install.py --info`
@@ -84,7 +95,7 @@ pagine**, **le 4 manopole** sono i 4 parametri sullo schermo (accelerano se giri
 | **ENV** | **EG**: ATTACK, DECAY, SUSTAIN, RELEASE · **INPUTS**: la presa GATE → **VCA**: VOLUME, **VCA MODE** (EG / ON), la presa VCA CV |
 | **LFO** | **LFO**: LFO RATE, LFO WAVE, la presa LFO RATE, **SYNC** → **S+H**: le prese S+H (VCO) e S+H GATE → **CLOCK**: CLOCK (valore di nota), GATE, TEMPO |
 | **FX** | **CHORUS**: ON, TYPE, SEND · RATE, DEPTH → **DELAY**: ON, SEND, TIME L, TIME R · FEEDBACK, PING-PONG, WIDTH · LOW CUT, HIGH CUT → **REVERB**: ON, SEND, DECAY, DAMP · PRE-DELAY, DIFFUSION, WIDTH |
-| **SEQ** | **PATCHBAY**: tutti i cavi → INPUTS 1: FOLD IN, 1V/OCT, PWM, ONE → INPUTS 2: LFO RATE, CUTOFF, GATE, VCA CV → INPUTS 3: TWO, S+H (VCO), S+H GATE, ATTN |
+| **SEQ** | **PATCHBAY**: tutti i cavi → **INPUTS** 1-4: FOLD IN, 1V/OCT, PWM, ONE · 5-8: LFO RATE, CUTOFF, GATE, VCA CV · 9-12: TWO, S+H (VCO), S+H GATE, ATTN. **SEQ di nuovo**: dall'una all'altra |
 | **SELECT premuto** | **UTL**: **WAVE FOLDER**: FOLD, la presa FOLD IN → **MIXER**: ONE LVL, le prese ONE e TWO → **ATTENUATOR**: ATTENUATOR, la presa ATTN |
 | **ARP** | L'arpeggiatore: MODE, OCTAVES, RATE, GATE. ARP premuto di nuovo: acceso / spento |
 | **GLO** | **KEYBOARD**: KB SCALE, GLIDE, PRIO, RETRIG → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, TEMPO, KEY VEL · LIGHTS (in alto a destra la CPU) |
@@ -154,8 +165,8 @@ loro carattere (tempi, feedback, decay…) è quello del suono della prima tracc
 ## MIDI con il Digitakt
 
 - **TRS MIDI IN** dell'FM-1 (adattatore TRS-DIN tipo A o B) o USB.
-- **GLO → GLOBAL → MIDI CH = N**: il canale N suona la **traccia 1**, N+1 la **2**, N+2 la **3**, N+3 la **4**,
-  qualunque traccia sia sul pannello. Con **OMNI** tutto suona la traccia sul pannello.
+- **GLO → GLOBAL → MIDI CH = N** (di serie **1**): il canale N suona la **traccia 1**, N+1 la **2**, N+2 la **3**,
+  N+3 la **4**, qualunque traccia sia sul pannello. Con **OMNI** tutto suona la traccia sul pannello.
 - Note, pitch bend, aftertouch, mod wheel (CC 1), volume della traccia (CC 7), sustain (CC 64), program change, e **una
   CC per ogni parametro, cavi ed effetti compresi** (`CC-NRPN.md`). Con un **p-lock sulla CC di una presa** il Digitakt
   cambia il cavo a quel passo.
@@ -216,9 +227,10 @@ l'FM-1 collegato) rifà le misure.
 Tutto è in Ubuntu (WSL) su questo PC, in `~/fm1/fmav1`:
 
 ```
-cd ~/fm1/fmav1 && sh build.sh --release 0.3            # -> build/fmav1-0.3.fwsc
+cd ~/fm1/fmav1 && sh build.sh --release 0.3.1          # -> build/fmav1-0.3.1.fwsc
 OBV_DEFS=-DMFM_NTRK=1u sh build.sh                     # la versione a una traccia
-sh tests/run_tests.sh                                 # tutti i test (sanitizer e fuzz compresi)
+sh tests/run_tests.sh                                 # tutti i test (sanitizer e fuzz compresi, ~25 min)
+QUICK=1 sh tests/run_tests.sh                         # gli stessi senza i 90 programmi sotto sanitizer (~5 min)
 ```
 
 FMav-1 è un lavoro indipendente: non è fatto, approvato né supportato da nessun costruttore di sintetizzatori e non

@@ -34,8 +34,8 @@ A = [
     (3200, "btn 2"), (3300, "enc 2 1"), (3500, "shot"),                                          # CHORUS ON
     (3600, "enc 0 2"), (3700, "enc 2 1"), (3800, "enc 3 -20"), (4000, "shot"),                   # DELAY ON, SEND
     (4100, "btn 13"), (4300, "shot"), (4400, "btn 13"), (4600, "shot"),                          # REC: off, on
-    (4700, "btn 11"), (4900, "shot"), (5000, "enc 0 1"), (5100, "enc 2 3"), (5200, "enc 3 1"),   # SEQ: overview, cables
-    (5400, "shot"), (5500, "enc 0 -1"), (5700, "shot"),
+    (4700, "btn 11"), (4900, "shot"), (5000, "btn 11"), (5100, "enc 2 3"), (5200, "enc 3 1"),   # SEQ: overview; INPUTS
+    (5250, "enc 5 20"), (5400, "shot"), (5500, "btn 11"), (5700, "shot"),                     # (ONE: last, DUMMY); overview
     (5800, "btn 3"), (5900, "enc 2 40"), (6100, "shot"), (6200, "btn 3"), (6400, "shot"),         # UTL (SELECT pressed)
     (6500, "btndown 6"), (6550, "btn 0"), (6600, "btnup 6"), (6800, "shot"),                     # EDIT + OCT-: undo
     (6900, "btn 5"), (7000, "enc 5 12"), (7200, "shot"),                                         # LFO SYNC 1/8

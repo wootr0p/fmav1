@@ -49,7 +49,7 @@ folds at 5 / 15 / 25 V, rounded peaks, 2x oversampled).
   SELECT pressed** (the user: "toglierei il tasto SEL in ogni pagina"): SELECT pressed is UTL's button (WAVE FOLDER,
   MIXER, ATTENUATOR); what it switched is a knob. No secret combos as the only way; the page dots map the whole
   section; the program's number has the track's colour. Every jack is on its module's pages and on SEQ (the whole
-  patchbay first, then the inputs on knobs with `g_jacks` listing their cables).
+  patchbay as one item, its inputs on knobs as another (SEQ again switches; `g_jacks` lists their cables).
 - The clock (0.3): `clock_block` in mfm_engine.h keeps one place for everything (Q20 MIDI clocks mod 2304, every note
   value divides it): at the tempo (`quarter_len`: the MIDI clock's measured, else TEMPO), held between the last MIDI
   clock and the next while one runs (`ctl_clk_ticks`, `ctl_clk_run`: the main loop counts 0xF8, 0xFA = Start puts it at
@@ -74,8 +74,8 @@ folds at 5 / 15 / 25 V, rounded peaks, 2x oversampled).
 - `mfm_params.h`: the parameter table (69 + a 12-character name in a 96-byte patch; 0.1 had 45, 0.2 66: their saved
   programs are converted by `patch_from_01` / `patch_from_02`, sector tag "MFMP" / "MFM2" -> "MFM3"). **The order is the
   MIDI CC order** (CC 20 up, skipping 64, 71-75, 91-93, 98, 99) and the NRPN number: append new parameters at the end.
-  The jacks `P_JACK + I_*` hold a source `J_*` (0 = no cable; `JORDER` the knob's order: ---, DUMMY, the panel's, CLOCK,
-  the MIDI ones), never one `JIN_DENY` refuses. I_MULT stays as a dead slot (the CC numbers keep their meaning).
+  The jacks `P_JACK + I_*` hold a source `J_*` (0 = no cable; `JORDER` the knob's order: ---, the panel's, CLOCK, the MIDI
+  ones, DUMMY last), never one `JIN_DENY` refuses. I_MULT stays as a dead slot (the CC numbers keep their meaning).
 - `mfm_dsp.h`: `pitch_inc`, the VCO `mvco_tick` (polyBLEP), the LFO `mlfo_tick`, the folder `fold1` / `fold_tick`, the
   ladder `ladder_coef` / `ladder_tick` (after FMini-1's, per sample).
 - `mfm_engine.h`: `track_t` (one voice), the keyboard, the EG (per block, interpolated), `clock_block`, `track_block`:
@@ -124,7 +124,11 @@ must be in time order and at most ~60 MIDI messages a millisecond; nothing befor
   output, the arp on its grid); DUMMY cables; no mult, VCA OUT not patchable (the splash: a cable into it); SEQ = the
   whole patchbay then the inputs on knobs; SELECT pressed = UTL, the switches as knobs; 90 programs; OCT LEDs; the LFO
   lights steady when fast; a lit knob's border fixed; MIDI cables from outside the panel; the name FMav-1, identity
-  FM-1_3628, licence and disclaimer, the hub's files. The user tests it before publishing.
+  FM-1_3628, licence and disclaimer, the hub's files. Installed (from V15, from Felucca), on GitHub, release v0.3 made by
+  the user (the hub's check then passed but for fmhub.json "kinds", fixed); the hub form in progress.
+- 0.3.1 (2026-11-14): DUMMY last in JORDER; MIDI CH 1 by default; SEQ = two items (PATCHBAY, INPUTS: SEQ again
+  switches); SAVE held lights F3 / G3 / A3, EDIT held lights OCT- / OCT+. Sound bit-identical to 0.3.
+- **Always: the user flashes and tries a build on the FM-1 before any push, release or hub update** (the user, 0.3.1).
 
 ## Style
 
