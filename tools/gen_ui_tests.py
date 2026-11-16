@@ -8,12 +8,13 @@ HDR = ("# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SA
        "# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS\n")
 
 # ---- every section (its button), every page (SELECT turned), a note held so the live graphs show it
-SECTIONS = [(8, 6), (6, 2), (4, 2), (5, 1), (2, 7), (11, 4), (3, 1), (10, 1), (7, 2)]   # (button, its pages: 4 tracks;
-# 0.5: HOME the MIXER, KEYBOARD, VOICE, GLOBAL; EDIT the VCO; GLO the VCF)
+SECTIONS = [(8, 5), (6, 2), (4, 2), (5, 1), (2, 7), (11, 4), (3, 2), (10, 1), (7, 2)]   # (button, its pages: 4 tracks;
+# 0.5: HOME the MIXER, VOICE, GLOBAL; EDIT the VCO; GLO the VCF; 0.5.1: SELECT pressed UTL, KEYBOARD)
 L = ["# every section, every page (SELECT turned; SELECT pressed: UTL), a note held so the live graphs show it\n" + HDR
      + "1500 midi 0xC0 2 0\n1600 midi 0x90 48 100"]
-L.append("1700 btn 4")   # (0.5: HOME is open at power-on: from another section it opens on its first page)
-t = 1800
+L.append("2000 btn 4")   # (0.5: HOME is open at power-on: from another section it opens on its first page; after
+#  the splash, ~1.9 s: two taps during it arrive together and the last section in buttons() wins)
+t = 2100
 for btn, n in SECTIONS:
     L.append(f"{t} btn {btn}"); t += 200
     L.append(f"{t} shot"); t += 100
@@ -43,15 +44,15 @@ A = [
     (6500, "btndown 6"), (6550, "btn 0"), (6600, "btnup 6"), (6800, "shot"),                     # EDIT + OCT-: undo
     (6900, "btn 5"), (7000, "enc 4 12"), (7200, "shot"),                                         # LFO SYNC 1/8
     (7500, "shot"),                                                                              # (SYNC: the clock's state)
-    (7520, "btn 8"), (7540, "enc 0 4"), (7560, "enc 4 2"), (7600, "enc 5 10"), (7610, "shot"),   # CLOCK TRS, TEMPO locked
+    (7520, "btn 8"), (7540, "enc 0 3"), (7560, "enc 4 2"), (7600, "enc 5 10"), (7610, "shot"),   # CLOCK TRS, TEMPO locked
     (7630, "btn 5"), (7650, "btn 10"), (7670, "enc 2 1"),                                        # the arp on (MODE UP)
     (7700, "trs 0xFA 0 0"), (8000, "midi 0xFC 0 0"),                                             # (USB: ignored)
 ]
 t = 7720
 while t < 9700:                                                                                  # a TRS clock, 125 bpm
     A.append((t, "trs 0xF8 0 0")); A.append((t + 7, "midi 0xF8 0 0")); A.append((t + 13, "midi 0xF8 0 0")); t += 20
-A += [(8400, "shot"), (9000, "btn 5"), (9100, "shot"), (9690, "shot"), (9700, "btn 8"), (9720, "enc 0 4"),   # GLOBAL
-      (9745, "shot"),                     # TRS 125 (0.5: HOME opens the MIXER: SELECT 4 = GLOBAL)
+A += [(8400, "shot"), (9000, "btn 5"), (9100, "shot"), (9690, "shot"), (9700, "btn 8"), (9720, "enc 0 3"),   # GLOBAL
+      (9745, "shot"),                     # TRS 125 (0.5: HOME opens the MIXER: SELECT 3 = GLOBAL)
       (9750, "trs 0xFC 0 0"), (9800, "midi 0x80 60 0"), (9900, "btn 10"), (9950, "enc 2 -1"), (10100, "shot"),   # arp off (MODE OFF)
       (10200, "btndown 9"), (10300, "keys 0x4"), (10400, "keys 0"), (10500, "btnup 9"), (10700, "shot"),   # random
       (10800, "keys 0x80"), (11300, "keys 0"), (11400, "btn 9"), (11500, "enc 6 5"), (11600, "btn 9"),     # save

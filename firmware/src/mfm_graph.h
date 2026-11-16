@@ -320,11 +320,13 @@ static void g_attn(const uint8_t *pv, uint32_t ti, uint16_t c)
 /* ---- the patchbay (0.3): SEQ's first page, the whole of it laid out as the panel's (3 columns x 7 rows, the mult
  * gone; a label over each jack: the inputs in plain print, the outputs in reverse), every cable drawn from its output
  * to its input, hanging (and swinging when just patched: swing, px). VCA OUT is the audio out: its cable goes off to
- * the headphones. A MIDI source's cable (VELO, MODWHL, PRESS, CLOCK) comes in from outside the panel, from above; a
+ * the headphones. A MIDI source's cable (VELO, MODWHL, AFTERTC, GATE) comes in from outside the panel, from above; a
  * DUMMY is a plug on its own, its cable hanging loose. y 48..239 */
+/* (0.5.1, the user) the sources from outside the panel (VELO, MODWHL, AFTERTC, GATE) one colour, khaki, apart from
+ * the panel's outputs */
 static const uint16_t CABLE_C[NJSRC] = {RGB(60, 60, 60), RGB(240, 240, 236), RGB(96, 172, 255), RGB(255, 150, 56),
     RGB(186, 146, 255), RGB(118, 222, 128), RGB(255, 214, 70), RGB(255, 110, 150), RGB(255, 110, 150), RGB(84, 208, 226),
-    RGB(255, 88, 76), RGB(255, 88, 76), RGB(200, 200, 120), RGB(200, 200, 120), RGB(200, 200, 120), RGB(250, 250, 200),
+    RGB(255, 88, 76), RGB(255, 88, 76), RGB(200, 200, 120), RGB(200, 200, 120), RGB(200, 200, 120), RGB(200, 200, 120),
     RGB(130, 130, 136), RGB(214, 226, 255)};
 typedef struct { uint8_t out, id; const char *lbl; } pbcell_t;   /* out: an output (id J_*), else an input (id I_*) */
 #define PB_ROWS 7u
@@ -362,7 +364,7 @@ static void pb_cable(int32_t ox, int32_t oy, int32_t ix, int32_t iy, int32_t bx,
 static void pb_plug(int32_t x, int32_t y, uint16_t c) { cv_disc_g(x, y, 4, blend565(c, C_INK, 70), blend565(c, C_SH, 100)); }
 static void ui_patchbay(const uint8_t *pv, const int16_t *swing, const char *sub, const pmap_t *pm)
 {
-    uint32_t r, c, i, ncab = 0, nvert = 0;
+    uint32_t r, c, i, ncab = 0, nvert = 0, next[3] = {0, 0, 0};
     cv_begin(240, 192, C_BG);
     ui_box(192, "PATCH", C_JACK);
     page_title("PATCHBAY", sub, pm, 0, C_JACK);
@@ -394,9 +396,14 @@ static void ui_patchbay(const uint8_t *pv, const int16_t *swing, const char *sub
             cv_round(ix + 7, iy + 12, 5, 5, blend565(CABLE_C[s], C_SH, 60));
             continue;
         }
-        if (JS_EXT(s)) {                        /* from outside the panel (MIDI): in from above, no plug at that end */
-            ox = ix - 14; oy = -10;
-            pb_cable(ox, oy, ix, iy, 0, 4 + swing[i] / 2, CABLE_C[s]);
+        if (JS_EXT(s)) {                        /* from outside the panel (MIDI): in from above, no plug at that end;
+                                                 * (0.5.1) each into a column from its own point, bowing sideways,
+                                                 * the sides alternating: two never coincide */
+            uint32_t col = (uint32_t)(ix - PB_X(0) + 32) / 64u % 3u;
+            ox = ix - 12 - 12 * (int32_t)(next[col]++ % 3u); oy = -10;
+            bow = 5 + (int32_t)(ncab % 3u) * 3 + swing[i] / 2;
+            ncab++;
+            pb_cable(ox, oy, ix, iy, (nvert++ & 1u) ? -bow : bow, 4, CABLE_C[s]);
             pb_plug(ix, iy, CABLE_C[s]);
             continue;
         }

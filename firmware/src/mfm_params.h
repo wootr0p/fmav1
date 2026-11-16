@@ -12,23 +12,24 @@
  * and its patchbay: one parameter per input jack (13), each holding the output (11) its cable comes from, 0 = no cable
  * (the input's normal: the VCO into S+H, the LFO into S+H GATE, -5 V into ONE, +5 V into ATTN ...).
  * Not on the reference panel (marked so in the manual): FINE (the PITCH knob is continuous; here PITCH steps in semitones for MIDI),
- * three MIDI sources a cable can take (VELO, MODWHL, PRESS: a MIDI-to-CV in the case), the keyboard's PRIORITY and
+ * MIDI sources a cable can take (VELO, MODWHL, AFTERTC, GATE: a MIDI-to-CV in the case), the keyboard's PRIORITY and
  * RETRIG (the classic: low note, legato), BEND, ANALOG (the drift), the arpeggiator.
  * The order is the MIDI CC order (CC 20 up, see cc_map_init): the most played first. Append new parameters at the end
  * (the CC / NRPN numbers and the saved programs keep their meaning). */
 
 /* the patchbay: the outputs a cable can take (J_NONE: no cable), the inputs that take one */
 enum { J_NONE, J_VCA, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE, J_ONETWO, J_ATTN, J_MULT1, J_MULT2, J_VELO, J_WHEEL,
-       J_PRESS, J_CLOCK, J_DUMMY, J_NOISE, NJSRC };   /* (0.3: J_VCA and the mult no longer offered; CLOCK, DUMMY
-                                                 * appended; 0.3.2: NOISE) */
+       J_AFTER, J_KGATE, J_DUMMY, J_NOISE, NJSRC };   /* (0.3: J_VCA and the mult no longer offered; CLOCK, DUMMY
+                                                 * appended; 0.3.2: NOISE; 0.5.1: PRESS called AFTERTC, J_KGATE the
+                                                 * note's gate in the CLOCK output's slot, gone in 0.5) */
 enum { I_1VOCT, I_PWM, I_CUTOFF, I_VCACV, I_LFORATE, I_GATE, I_FOLD, I_SHIN, I_SHGATE, I_ONE, I_TWO, I_ATTN, I_MULT,
        NJIN };
 static const char *const JSRC_NAME[NJSRC] = {"---", "VCA", "KB CV", "VCO", "LFO", "EG", "S+H", "ONE", "ONE+TWO",
-    "ATTN", "MULT 1", "MULT 2", "VELO", "MODWHL", "PRESS", "CLOCK", "DUMMY", "NOISE"};
+    "ATTN", "MULT 1", "MULT 2", "VELO", "MODWHL", "AFTERTC", "GATE", "DUMMY", "NOISE"};
 /* the order a jack's knob runs through its choices: no cable, the panel's outputs, the clock, the MIDI sources, and
  * last a dummy (a plug on its own: the normal broken, 0 V; 0.3.1, the user: "in fondo all'elenco") */
 static const uint8_t JORDER[] = {J_NONE, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE, J_ONETWO, J_ATTN, J_NOISE,
-    J_VELO, J_WHEEL, J_PRESS, J_DUMMY};
+    J_VELO, J_WHEEL, J_AFTER, J_KGATE, J_DUMMY};
 #define NJORDER (sizeof JORDER / sizeof JORDER[0])
 #define JS_EXT(s) ((s) >= J_VELO && (s) != J_DUMMY)   /* not on the panel (MIDI, the clock, the noise): a cable
                                                  * from the edge */
@@ -184,7 +185,7 @@ static const uint8_t CT_RATE[3] = {52, 61, 100}, CT_DEPTH[3] = {94, 94, 13};   /
 /* 0.3 (the user): VCA OUT is the audio out (the headphones are in it): no cable from it; the mult is gone (its input
  * takes nothing, its outputs are offered to no one) */
 #define JB(s) (1u << (s))
-#define JD_ALL (JB(J_VCA) | JB(J_MULT1) | JB(J_MULT2) | JB(J_CLOCK))   /* (0.5: no CLOCK output) */
+#define JD_ALL (JB(J_VCA) | JB(J_MULT1) | JB(J_MULT2))   /* (0.5: no CLOCK output; 0.5.1: its slot is GATE) */
 static const uint32_t JIN_DENY[NJIN] = {
     [I_1VOCT] = JD_ALL | JB(J_VCO), [I_PWM] = JD_ALL | JB(J_VCO), [I_CUTOFF] = JD_ALL, [I_VCACV] = JD_ALL,
     [I_LFORATE] = JD_ALL | JB(J_LFO), [I_GATE] = JD_ALL | JB(J_EG), [I_FOLD] = JD_ALL, [I_SHIN] = JD_ALL | JB(J_SH),
@@ -208,6 +209,13 @@ static void patch_fix_values(uint8_t *v)      /* (0.3.2) a value out of its rang
 {
     uint32_t i;
     for (i = 0; i < NPARAM; i++) if (v[i] > PDEF[i].max) v[i] = PDEF[i].def;
+}
+/* (0.5.1) a program saved before 0.5 may have a cable from the CLOCK output: its slot is GATE now, the cable goes
+ * (as in 0.5, where the output was gone) */
+static void patch_drop_clock(uint8_t *v)
+{
+    uint32_t i;
+    for (i = 0; i < NJIN; i++) if (v[PJ(i)] == J_KGATE) v[PJ(i)] = J_NONE;
 }
 static void patch_fix_jacks(uint8_t *v)
 {

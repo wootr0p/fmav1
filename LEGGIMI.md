@@ -1,4 +1,4 @@
-# FMav-1 0.5 per M-VAVE FM-1
+# FMav-1 0.5.1 per M-VAVE FM-1
 
 Un **sintetizzatore monofonico semi-modulare** dentro l'FM-1, ricostruito controllo per controllo e presa per presa dal
 manuale d'uso del suo strumento di riferimento: un **VCO** (dente di sega → impulso, PULSE WIDTH, PWM), un **filtro
@@ -17,6 +17,16 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > **tuo rischio**: gli autori non rispondono di danni all'FM-1 (compreso un FM-1 che non si avvia più, "brickato"), ad
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
+
+## Novità della 0.5.1
+
+- **KEYBOARD passa su SELECT premuto**, come seconda pagina dopo UTL. HOME ora ha MIXER (i LEVEL, poi i PAN), VOICE
+  e GLOBAL.
+- **Una sorgente nuova nel patchbay: GATE**, +5 V mentre una nota è tenuta (dai tasti dell'FM-1 o via MIDI, anche
+  le note dell'arpeggiatore), 0 V quando la lasci. Per esempio GATE → CUTOFF apre il filtro solo mentre suoni.
+- **PRESS si chiama AFTERTC** (l'aftertouch MIDI).
+- **I cavi delle sorgenti esterne** (VELO, MODWHL, AFTERTC, GATE) hanno tutti lo stesso colore, cachi, per
+  distinguerli dalle uscite del pannello; due che entrano nella stessa colonna non si sovrappongono più.
 
 ## Novità della 0.5
 
@@ -54,7 +64,7 @@ programmi rifatti dall'INIT in modo da poterli rifare sul riferimento, il pannel
 
 - **I 90 programmi rifatti dall'INIT**: ognuno cambia solo le manopole che servono al suo suono (le altre restano come
   nell'INIT) e usa solo ciò che ha il pannello di riferimento, più gli effetti: niente rumore bianco, cavi VELO /
-  MODWHL / PRESS, FINE, ANALOG, arpeggiatore o LFO SYNC. Così si rifanno sul riferimento partendo dal suo INIT e
+  MODWHL / AFTERTC / GATE, FINE, ANALOG, arpeggiatore o LFO SYNC. Così si rifanno sul riferimento partendo dal suo INIT e
   girando solo quelle manopole (l'elenco, nell'ordine del pannello, è in `firmware/src/mfm_patches.h`). Suonano come
   nella 0.4.1, con ogni manopola portata sulle curve nuove a parità di Hz, tempi e livelli. I programmi di rumore (37
   NOISE HIT, 69 CLOCK HATS, 79 WIND, 81 SNARE, 82 HI-HAT, 83 CLAP) fanno il rumore con il VCO e l'LFO che si modulano
@@ -182,7 +192,7 @@ programmi rifatti dall'INIT in modo da poterli rifare sul riferimento, il pannel
 2. Da questa cartella:
 
    ```
-   py fm1_install.py fmav1-0.5.fwsc --yes
+   py fm1_install.py fmav1-0.5.1.fwsc --yes
    ```
 
    Per vedere cosa c'è installato: `py fm1_install.py --info`
@@ -206,26 +216,26 @@ solo posto; i cavi si collegano da SEQ.
 
 **La mappa delle pagine** (il pulsante premuto 1, 2, 3... volte; con 4 tracce):
 
-- **HOME**: 1 MIXER (i LEVEL) · 2 MIXER (i PAN) · 3 KEYBOARD · 4 VOICE · 5 GLOBAL (MIDI CH, TUNE, CLOCK, TEMPO) ·
-  6 GLOBAL (KEY VEL, LIGHTS)
+- **HOME**: 1 MIXER (i LEVEL) · 2 MIXER (i PAN) · 3 VOICE · 4 GLOBAL (MIDI CH, TUNE, CLOCK, TEMPO) ·
+  5 GLOBAL (KEY VEL, LIGHTS)
 - **EDIT**: 1 VCO · 2 VCO MOD
 - **ENV**: 1 EG · 2 VCA
 - **LFO**: 1 LFO
 - **FX**: 1-3 DELAY · 4-5 REVERB · 6-7 CHORUS
 - **SEQ**: 1 PATCHBAY · 2 INPUTS 1-4 · 3 INPUTS 5-8 · 4 INPUTS 9-12
-- **SELECT premuto**: 1 UTL
+- **SELECT premuto**: 1 UTL · 2 KEYBOARD
 - **ARP**: 1 ARPEGGIATORE
 - **GLO**: 1 VCF · 2 VCF MOD
 
 | Pulsante | Le pagine che SELECT scorre |
 | --- | --- |
-| **HOME** | **MIXER**: i LEVEL delle 4 tracce · i loro PAN → **KEYBOARD**: KB SCALE, GLIDE, PRIO, RETRIG → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, CLOCK, TEMPO · KEY VEL, LIGHTS (in alto a destra la CPU) |
+| **HOME** | **MIXER**: i LEVEL delle 4 tracce · i loro PAN → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, CLOCK, TEMPO · KEY VEL, LIGHTS (in alto a destra la CPU) |
 | **EDIT** | **VCO**: PITCH, VCO WAVE, PULSE WIDTH, FINE · **MOD**: VCO MOD MIX, PITCH MOD AMT, PWM AMT |
 | **ENV** | **EG**: ATTACK, DECAY, SUSTAIN, RELEASE → **VCA**: VOLUME, **VCA MODE** (EG / ON) |
 | **LFO** | **LFO**: LFO RATE, LFO WAVE, **SYNC**, RATE FINE |
 | **FX** | **DELAY**: ON, SEND, TIME L, TIME R · FEEDBACK, PING-PONG, WIDTH · LOW CUT, HIGH CUT → **REVERB**: ON, SEND, DECAY, DAMP · PRE-DELAY, DIFFUSION, WIDTH → **CHORUS**: ON, TYPE, SEND · RATE, DEPTH |
 | **SEQ** | **PATCHBAY**: tutti i cavi → **INPUTS** 1-4: FOLD IN, 1V/OCT, PWM, ONE · 5-8: LFO RATE, CUTOFF, GATE, VCA CV · 9-12: TWO, S+H (VCO), S+H GATE, ATTN |
-| **SELECT premuto** | **UTL**: FOLD, ONE LVL, ATTENUATOR, **NOISE** |
+| **SELECT premuto** | **UTL**: FOLD, ONE LVL, ATTENUATOR, **NOISE** → **KEYBOARD**: KB SCALE, GLIDE, PRIO, RETRIG |
 | **ARP** | L'arpeggiatore: MODE (OFF: spento), OCTAVES, RATE, GATE |
 | **GLO** | **VCF**: CUTOFF, RESONANCE, CUT FINE · **MOD**: VCF MOD MIX, VCF MOD AMT |
 | **ALGORITHM** | **La traccia** sul pannello (1-4): tastiera, pagine e PRESETS lavorano su quella |
@@ -264,7 +274,9 @@ spina senza niente dall'altra parte (la normalizzazione tolta, 0 V).
 | **ATTN (+5)** | **(+5V)** | quello che l'ATTENUATOR riduce (senza cavo: una tensione 0..+5 V) |
 
 Le uscite: **KB CV**, **VCO**, **LFO**, **EG**, **S+H**, **ONE**, **ONE+TWO**, **ATTN**, il **NOISE** (rumore bianco),
-tre sorgenti MIDI **VELO**, **MODWHL**, **PRESS** (0..+5 V) e **DUMMY**. **VCA OUT** è l'uscita audio. Una stessa uscita può andare a
+le sorgenti esterne **VELO**, **MODWHL**, **AFTERTC** (l'aftertouch MIDI, 0..+5 V) e **GATE** (+5 V mentre una nota è
+tenuta, dai tasti dell'FM-1 o via MIDI, anche le note dell'arpeggiatore; 0 V quando la lasci), con i cavi color cachi
+che arrivano dall'alto, e **DUMMY**. **VCA OUT** è l'uscita audio. Una stessa uscita può andare a
 quante prese vuoi; un ingresso non prende mai le uscite del suo modulo. Le tensioni: VCO, LFO e S+H ±5 V, EG 0-8 V, il
 mixer satura a ±8 V, NOISE ±5 V.
 
@@ -337,7 +349,7 @@ loro carattere (tempi, feedback, decay…) è quello del suono della prima tracc
 | 86 DROP | 87 RISER | 88 UFO | 89 DRONE 5TH | 90 DARK DRONE |
 
 **Ogni programma parte dall'INIT e cambia solo le manopole che servono a quel suono**, usando solo ciò che ha il
-pannello di riferimento (più gli effetti): niente NOISE, VELO, MODWHL, PRESS, FINE, ANALOG, arpeggiatore o LFO SYNC.
+pannello di riferimento (più gli effetti): niente NOISE, VELO, MODWHL, AFTERTC, GATE, FINE, ANALOG, arpeggiatore o LFO SYNC.
 Così si rifanno sullo strumento di riferimento partendo dal suo INIT e girando solo quelle manopole: l'elenco di
 ognuno, nell'ordine del pannello, è in `firmware/src/mfm_patches.h`.
 
@@ -370,7 +382,7 @@ l'FM-1 collegato) rifà le misure.
 Tutto è in Ubuntu (WSL) su questo PC, in `~/fm1/fmav1`:
 
 ```
-cd ~/fm1/fmav1 && sh build.sh --release 0.5            # -> build/fmav1-0.5.fwsc
+cd ~/fm1/fmav1 && sh build.sh --release 0.5.1          # -> build/fmav1-0.5.1.fwsc
 OBV_DEFS=-DMFM_NTRK=1u sh build.sh                     # la versione a una traccia
 sh tests/run_tests.sh                                 # tutti i test (sanitizer e fuzz compresi, ~3 min)
 QUICK=1 sh tests/run_tests.sh                         # gli stessi senza i 90 programmi sotto sanitizer (~5 min)

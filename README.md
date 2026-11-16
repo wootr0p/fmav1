@@ -25,7 +25,7 @@ and the folder at audio rate).
 
 The panel: a button opens a section at its first page (pressed again: its next page, the first after the last: pressed
 N times = page N, whatever was open before), SELECT turned runs through its pages and stops at the first and the last
-(the same keys always reach the same page: it can be played by heart, without looking), the four knobs are the page's, SELECT pressed opens UTL (folder, mixer, attenuator, noise). Every knob has one place. HOME: the mixer (levels, pans), KEYBOARD, VOICE,
+(the same keys always reach the same page: it can be played by heart, without looking), the four knobs are the page's, SELECT pressed opens UTL (folder, mixer, attenuator, noise), then KEYBOARD. Every knob has one place. HOME: the mixer (levels, pans), VOICE,
 GLOBAL; EDIT: the VCO; GLO: the VCF. An input jack is a knob that picks the output its cable comes from: SEQ shows the whole
 patchbay with its cables, then every input on the knobs. The screen is our own drawing (white print on black,
 vertical module tabs, a 13-button keyboard), animated (the LFO LED, the tracks' lamps, the cables' swing, the boot: a
@@ -42,7 +42,7 @@ the changes [CHANGELOG.md](CHANGELOG.md).
 From The Firmware Hub (one click, Chrome / Edge), or with the installer from a release:
 
 ```sh
-python3 tools/fm1_install.py fmav1-0.5.fwsc --yes      # FM-1 on USB, switched on
+python3 tools/fm1_install.py fmav1-0.5.1.fwsc --yes    # FM-1 on USB, switched on
 ```
 
 It installs over most FM-1 firmwares (Felucca, SLOOP, OberVave and their forks) and keeps their stored programs
@@ -52,7 +52,7 @@ the installer again.
 ## Build
 
 ```sh
-sh build.sh --release 0.5                              # build/fmav1-0.5.fwsc
+sh build.sh --release 0.5.1                            # build/fmav1-0.5.1.fwsc
 OBV_DEFS=-DMFM_NTRK=1u sh build.sh                     # the one-track build
 sh tests/run_host.sh tests/mfm_programs.txt programs   # on a computer: build/host/programs.wav and the screens
 sh tests/run_tests.sh                                  # every host test, sanitizers and a parameter fuzz (~3 min, 8 cores)

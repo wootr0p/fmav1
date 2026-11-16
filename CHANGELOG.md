@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.1 (2026-11-16)
+
+- **KEYBOARD moved to SELECT pressed** (the user), its second page after UTL; HOME is the MIXER (levels, pans),
+  VOICE and GLOBAL.
+- **A new patch source, GATE**: +5 V while a note is held (the FM-1's keys or MIDI, the arpeggiator's notes too),
+  0 V when let go. It takes the slot the CLOCK output left in 0.5, so no other cable's CC value moves (GATE: 109);
+  a cable from CLOCK in a program saved by 0.4.1 or before still becomes no cable.
+- **PRESS is called AFTERTC** (the MIDI aftertouch).
+- **The external sources' cables** (VELO, MODWHL, AFTERTC, GATE) share one colour, khaki, apart from the panel's
+  outputs; two coming into one column enter from their own points and bow apart.
+
 ## 0.5 (2026-11-16)
 
 Every knob calibrated against the reference instrument (the user's recordings, scope captures and photos of its panel),

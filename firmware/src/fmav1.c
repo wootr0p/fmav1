@@ -175,8 +175,8 @@ enum { AC_PERF, AC_VCO, AC_VCF, AC_ENV, AC_LFO, AC_UTL, AC_JACK, AC_GLOB, AC_FX 
  * a hint for the footer */
 typedef struct { const char *title; uint8_t npg, acc; int8_t tab; uint8_t gr[5]; const char *sub[5]; int16_t p[5][4]; const char *hint; } item_t;
 
-/* (0.5, the user) HOME: the mixer (the levels, then the pans), then what GLO had (KEYBOARD, VOICE, GLOBAL); the three
- * PERFORM pages gone. EDIT: the VCO; GLO: the VCF */
+/* (0.5, the user) HOME: the mixer (the levels, then the pans), then what GLO had (VOICE, GLOBAL); the three PERFORM
+ * pages gone. EDIT: the VCO; GLO: the VCF. (0.5.1, the user) KEYBOARD on SELECT pressed, after UTILITIES */
 static const item_t IT_HOME[] = {
 #if NTRK > 1
     {"MIXER", 2, AC_PERF, TAB_NONE, {G_TRACKS, G_TRACKS}, {"LEVELS", "PANS"},
@@ -184,13 +184,11 @@ static const item_t IT_HOME[] = {
 #else
     {"MIXER", 1, AC_PERF, TAB_NONE, {G_TRACKS}, {0}, {{V_LVL1, V_PAN1, NONE, NONE}}, "THE TRACK'S|LEVEL AND PAN"},
 #endif
-    {"KEYBOARD", 1, AC_GLOB, TAB_NONE, {G_KB}, {0}, {{P_KB_SCALE, P_GLIDE, P_PRIO, P_RETRIG}},
-        "LOW NOTE,|LEGATO: CLASSIC"},
     {"VOICE", 1, AC_GLOB, TAB_NONE, {G_SCOPE}, {0}, {{P_BEND, P_DRIFT, NONE, NONE}}, "ANALOG: THE|DRIFT"},
     {"GLOBAL", 2, AC_GLOB, TAB_NONE, {G_SCOPE, G_SCOPE}, {0, 0}, {{V_MIDICH, V_TUNE, V_CLKSRC, V_TEMPO}, {V_KVEL, V_LIGHTS, NONE, NONE}},
         NTRK > 1 ? "CH N: TRACK 1|N+1: TRACK 2 .." : "MIDI CH: THE|TRACK'S CHANNEL"},
 };
-#define HOME_GLOBAL 3u                          /* IT_HOME's GLOBAL (its CPU meter) */
+#define HOME_GLOBAL 2u                          /* IT_HOME's GLOBAL (its CPU meter) */
 /* (0.4, the user: no knob twice) the cables only on SEQ, TEMPO only on GLOBAL */
 static const item_t IT_EDIT[] = {
     {"VCO", 2, AC_VCO, TAB_VCO, {G_VCO, G_VMOD}, {0, "MOD"},
@@ -222,6 +220,8 @@ static const item_t IT_UTL[] = {               /* SELECT pressed (0.3): the util
                                                  * too; their cables on SEQ) */
     {"UTILITIES", 1, AC_UTL, TAB_UTL, {G_FOLD}, {0}, {{P_FOLD, P_ONE_LVL, P_ATTN, P_NOISE}},
         "CABLES: SEQ|VCO > FOLD IN"},
+    {"KEYBOARD", 1, AC_GLOB, TAB_NONE, {G_KB}, {0}, {{P_KB_SCALE, P_GLIDE, P_PRIO, P_RETRIG}},   /* (0.5.1: from HOME) */
+        "LOW NOTE,|LEGATO: CLASSIC"},
 };
 static const item_t IT_FX[] = {                 /* FX: the delay, the reverb (shared, a send each) and the chorus (0.5,
                                                  * the user: the delay first, the quickest to reach; draw_page's ON[]
@@ -238,8 +238,8 @@ static const item_t IT_ARP[] = { {"ARPEGGIATOR", 1, AC_GLOB, TAB_NONE, {G_ARP}, 
 enum { S_HOME, S_EDIT, S_ENV, S_LFO, S_FX, S_PATCH, S_ARP, S_VCF, S_UTL, NSEC };
 typedef struct { const item_t *it; uint8_t n, btn; } section_t;
 static const section_t SEC[NSEC] = {
-    {IT_HOME, 4, BTN_HOME}, {IT_EDIT, 1, BTN_EDIT}, {IT_ENV, 2, BTN_ENV}, {IT_LFO, 1, BTN_LFO}, {IT_FX, 3, BTN_FX},
-    {IT_PATCH, 2, BTN_SEQ}, {IT_ARP, 1, BTN_ARP}, {IT_VCF, 1, BTN_GLO}, {IT_UTL, 1, BTN_SEL},
+    {IT_HOME, 3, BTN_HOME}, {IT_EDIT, 1, BTN_EDIT}, {IT_ENV, 2, BTN_ENV}, {IT_LFO, 1, BTN_LFO}, {IT_FX, 3, BTN_FX},
+    {IT_PATCH, 2, BTN_SEQ}, {IT_ARP, 1, BTN_ARP}, {IT_VCF, 1, BTN_GLO}, {IT_UTL, 2, BTN_SEL},
 };
 static uint32_t sec = S_HOME, sec_item[NSEC], item_pg[NSEC][8];
 
@@ -786,9 +786,10 @@ static const char *tab_text(const item_t *it)   /* the box's tab: the module, as
     static const char *const TT[NTAB] = {"VCO", "VCF", "EG", "VCA", "LFO", "UTL", "PATCH", "FX"};
     if (it->tab >= 0) return TT[it->tab % NTAB];
     if (sec == S_ARP) return "ARP";
+    if (sec == S_UTL) return "KB";              /* (0.5.1: KEYBOARD, SELECT's second item) */
     {                                           /* (HOME's items, 0.5) */
-        static const char *const HT[4] = {"MIX", "KB", "VOICE", "GLO"};
-        return HT[sec_item[S_HOME] % 4u];
+        static const char *const HT[3] = {"MIX", "VOICE", "GLO"};
+        return HT[sec_item[S_HOME] % 3u];
     }
 }
 
@@ -1343,6 +1344,7 @@ static void app_main(void)
                     if (psect[i].tag != PS_TAG_05) patch_from_04(&psect[i].p[j]);   /* (every one before 0.5: ATTACK) */
                     if (psect[i].tag == PS_TAG_04 || psect[i].tag == PS_TAG_05)   /* (S+H IN took the noise then) */
                         patch_keep_sh_noise(psect[i].p[j].v);
+                    patch_drop_clock(psect[i].p[j].v);   /* (0.5.1: CLOCK's slot is GATE now) */
                 }
             psect[i].tag = PS_TAG;
         }

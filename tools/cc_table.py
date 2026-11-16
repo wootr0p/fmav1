@@ -34,7 +34,7 @@ NAME = {
 JIN = ["1V/OCT", "PWM", "CUTOFF", "VCA CV", "LFO RATE", "GATE", "FOLD IN", "S+H IN (senza cavo: VCO)", "S+H GATE", "ONE", "TWO", "ATTN",
        "(MULT: non c'è più, ignorata)"]
 JSRC = ["nessun cavo", None, "KB CV", "VCO", "LFO", "EG", "S+H", "ONE", "ONE+TWO", "ATTN", None, None, "VELO *",
-        "MODWHL *", "PRESS *", None, "DUMMY (spina sola: 0 V, niente normalizzazione) *", "NOISE (rumore bianco) *"]   # (None: not offered)
+        "MODWHL *", "AFTERTC (aftertouch) *", "GATE (nota tenuta: tasti o MIDI) *", "DUMMY (spina sola: 0 V, niente normalizzazione) *", "NOISE (rumore bianco) *"]   # (None: not offered)
 
 
 def names():

@@ -3,7 +3,7 @@
  * by X. Our own sounds in the spirit of a small semi-modular (nobody's patches copied): basses, leads, the patchbay's
  * sounds, drums and effects; the drones (VCA ON: they sound without a note, as the hardware does) last.
  * 0.5 (the user): rebuilt from INIT, so each can be set up on the reference by turning only the knobs listed, in the
- * panel's order: only what the reference has (the effects aside: no white noise, no VELO / MODWHL / PRESS cable, no
+ * panel's order: only what the reference has (the effects aside: no white noise, no VELO / MODWHL / AFTERTC / GATE cable, no
  * FINE, ANALOG, arp or LFO SYNC), and only the knobs each sound needs (every other one back at INIT's where the
  * simulator heard no difference). The sounds are 0.4.1's, each knob at the value of the same Hz, time or level on
  * the curves fitted to the reference (CLASSIC BASS: the reference's own, from a photo); the noise programs remade with

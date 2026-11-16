@@ -54,7 +54,9 @@ folds at 5 / 15 / 25 V, rounded peaks, 2x oversampled).
   pressed again the next (wrapping: pressed N times = page N); SELECT stops at both ends (`page_step(e, wrap)`);
   EDIT / GLO / SAVE act on release whatever the hold if not used as a modifier; ARP again does nothing more (MODE
   turns the arp off); FX order DELAY, REVERB, CHORUS. tests/mfm_det_a/_b.txt check it (run_tests.sh `det`).
-  0.5, the user: HOME = MIXER, KEYBOARD, VOICE, GLOBAL (IT_HOME, HOME_GLOBAL its CPU meter; no PERFORM); EDIT = the
+  0.5, the user: HOME = MIXER, VOICE, GLOBAL (IT_HOME, HOME_GLOBAL its CPU meter; no PERFORM; 0.5.1: KEYBOARD on
+  SELECT pressed, IT_UTL's second item; J_AFTER is AFTERTC (was PRESS); J_KGATE = GATE, t->kgate as 0 / +5 V, in
+  J_CLOCK's old slot so the cables' CC values stay; `patch_drop_clock` for pre-0.5 saves); EDIT = the
   VCO; GLO = the VCF (S_VCF, on press). HOLD: PLAY green (`led_play_green`: the FM-1's PLAY green at fm1_led[8]
   bit 1). The LFO button lit only on its page. leds(): the first pass sets every LED (REC was dark at power-on).
   The programs' order: 51, 11, 1, 17, 58, 66 first (build/presets/reorder.py, reorder_map.txt).
@@ -156,6 +158,9 @@ must be in time order and at most ~60 MIDI messages a millisecond; nothing befor
   the sync's tempo): `ctl_clk_ext` (USB / TRS chosen) makes arp_tick step only on the clock's grid (no clock running:
   the first note, then it waits); TEMPO locked (`knob_view_t.locked`: grey; turned: a toast), pget/param_value show the
   measured tempo ("TRS 125", "TRS ---"); a first measure after 24 clocks, then every 96 as before.
+- 0.5.1 (2026-11-16, the user): KEYBOARD on SELECT pressed; PRESS called AFTERTC; a GATE patch source (the note
+  held, keys or MIDI) in the CLOCK output's old slot; the external sources' cables khaki and bowed apart; the test
+  suite with progress and parallel sanitizers last (~2.5 min).
 - 0.5 (2026-11-16): the CLOCK output and its page removed (the user: "nel [riferimento] non c'è e non te l'ho
   chiesto"); programs 62, 63, 64, 69 on the LFO synced (build/cmp042.py: same levels, envelopes alike); the LFO page's
   subtitle says the clock's state while SYNC is on. Lesson: add nothing the reference panel lacks without asking.

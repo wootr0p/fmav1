@@ -94,7 +94,8 @@ La CC di una presa (38-49) sceglie da quale uscita arriva il suo cavo. Il valore
 | ATTN | 64 |
 | VELO * | 86 |
 | MODWHL * | 94 |
-| PRESS * | 101 |
+| AFTERTC (aftertouch) * | 101 |
+| GATE (nota tenuta: tasti o MIDI) * | 109 |
 | DUMMY (spina sola: 0 V, niente normalizzazione) * | 116 |
 | NOISE (rumore bianco) * | 124 |
 

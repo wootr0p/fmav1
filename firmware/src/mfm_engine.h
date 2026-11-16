@@ -427,7 +427,9 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
     /* the MIDI sources (not on the reference panel): 0 .. +5 V */
     o[J_VELO] = t->vel * 5 * VOLT / 127;
     o[J_WHEEL] = ctl_wheel[ti] * 5 * VOLT / 127;
-    o[J_PRESS] = ctl_after[ti] * 5 * VOLT / 127;
+    o[J_AFTER] = ctl_after[ti] * 5 * VOLT / 127;   /* (AFTERTC: channel or key pressure) */
+    o[J_KGATE] = t->kgate ? 5 * VOLT : 0;      /* (0.5.1, the user: GATE, a note held on the keys or by MIDI, the arp's
+                                                 * gates too) */
     /* the EG: the keyboard's gate or the GATE jack's (its Schmitt trigger runs each sample below) */
     gate = t->kgate || (jk[I_GATE] && t->gate_hi);
     t->eg0 = t->eg;
@@ -452,7 +454,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
         else lfo_p8 = p8_of_inc(inc);           /* (a cable on LFO RATE: the CV around the synced rate, free) */
     }
     ui_lfo_inc[ti] = jk[I_LFORATE] ? pitch_inc(lfo_p8) : lfo_inc;
-    o[J_CLOCK] = o[J_DUMMY] = 0;               /* DUMMY 0 V (0.5: no CLOCK output; its slot stays, never patched) */
+    o[J_DUMMY] = 0;                            /* DUMMY 0 V */
     lw = (t->lw_sm * 258) >> 8;                 /* (Q15) */
     /* nothing to hear: the EG at rest, the VCA closed (its MODE on EG, no cable on VCA CV or GATE). The LFO and the VCO
      * run on (free-running), the S+H keeps what it holds */

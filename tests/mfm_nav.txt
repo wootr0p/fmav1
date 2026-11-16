@@ -3,10 +3,8 @@
 # encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS
 1500 midi 0xC0 2 0
 1600 midi 0x90 48 100
-1700 btn 4
-1800 btn 8
-2000 shot
-2100 enc 0 1
+2000 btn 4
+2100 btn 8
 2300 shot
 2400 enc 0 1
 2600 shot
@@ -50,11 +48,13 @@
 8300 shot
 8400 btn 3
 8600 shot
-8700 btn 10
+8700 enc 0 1
 8900 shot
-9000 btn 7
+9000 btn 10
 9200 shot
-9300 enc 0 1
+9300 btn 7
 9500 shot
-9600 midi 0x80 48 0
-10100 end
+9600 enc 0 1
+9800 shot
+9900 midi 0x80 48 0
+10400 end
