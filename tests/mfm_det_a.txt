@@ -1,0 +1,24 @@
+# the navigation's determinism, history A (0.5: tools/gen_ui_tests.py; shots [7000, 7300, 8000, 8700, 9000, 9300])
+# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SAVE 10 ARP 11 SEQ 12 PLAY 13 REC
+# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS
+6000 btn 8
+6200 btn 7
+6400 btn 7
+6600 btn 6
+6800 btn 6
+7000 shot
+7100 btn 2
+7300 shot
+7400 btn 2
+7600 btn 2
+7800 btn 2
+8000 shot
+8100 btn 11
+8300 btn 11
+8500 btn 11
+8700 shot
+8800 enc 0 -20
+9000 shot
+9100 enc 0 20
+9300 shot
+9400 end

@@ -1,7 +1,7 @@
 # the panel's actions (0.3: tools/gen_ui_tests.py)
 # buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SAVE 10 ARP 11 SEQ 12 PLAY 13 REC
 # encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS
-1500 midi 0xC0 15 0
+1500 midi 0xC0 19 0
 1600 midi 0x90 60 100
 1800 btn 4
 1900 enc 0 1
@@ -16,10 +16,10 @@
 3100 shot
 3200 btn 2
 3300 enc 2 1
+3400 enc 3 -20
 3500 shot
-3600 enc 0 2
+3600 enc 0 5
 3700 enc 2 1
-3800 enc 3 -20
 4000 shot
 4100 btn 13
 4300 shot
@@ -47,16 +47,15 @@
 6900 btn 5
 7000 enc 4 12
 7200 shot
-7300 enc 0 1
 7500 shot
-7520 btn 7
-7540 enc 0 2
+7520 btn 8
+7540 enc 0 4
 7560 enc 4 2
 7600 enc 5 10
 7610 shot
 7630 btn 5
 7650 btn 10
-7670 btn 10
+7670 enc 2 1
 7700 trs 0xFA 0 0
 7720 trs 0xF8 0 0
 7727 midi 0xF8 0 0
@@ -360,12 +359,13 @@
 9687 midi 0xF8 0 0
 9690 shot
 9693 midi 0xF8 0 0
-9700 btn 7
+9700 btn 8
+9720 enc 0 4
 9745 shot
 9750 trs 0xFC 0 0
 9800 midi 0x80 60 0
 9900 btn 10
-9950 btn 10
+9950 enc 2 -1
 10100 shot
 10200 btndown 9
 10300 keys 0x4

@@ -27,7 +27,7 @@ static const char *const JSRC_NAME[NJSRC] = {"---", "VCA", "KB CV", "VCO", "LFO"
     "ATTN", "MULT 1", "MULT 2", "VELO", "MODWHL", "PRESS", "CLOCK", "DUMMY", "NOISE"};
 /* the order a jack's knob runs through its choices: no cable, the panel's outputs, the clock, the MIDI sources, and
  * last a dummy (a plug on its own: the normal broken, 0 V; 0.3.1, the user: "in fondo all'elenco") */
-static const uint8_t JORDER[] = {J_NONE, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE, J_ONETWO, J_ATTN, J_NOISE, J_CLOCK,
+static const uint8_t JORDER[] = {J_NONE, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE, J_ONETWO, J_ATTN, J_NOISE,
     J_VELO, J_WHEEL, J_PRESS, J_DUMMY};
 #define NJORDER (sizeof JORDER / sizeof JORDER[0])
 #define JS_EXT(s) ((s) >= J_VELO && (s) != J_DUMMY)   /* not on the panel (MIDI, the clock, the noise): a cable
@@ -35,7 +35,7 @@ static const uint8_t JORDER[] = {J_NONE, J_KBCV, J_VCO, J_LFO, J_EG, J_SH, J_ONE
 static const char *const JIN_NAME[NJIN] = {"1V/OCT", "PWM", "CUTOFF", "VCA CV", "LFO RT", "GATE", "FOLD IN", "S+H IN",
     "S+H GT", "ONE", "TWO", "ATTN", "MULT"};
 /* an input with no cable: its normal, as the knob shows it */
-static const char *const JIN_NORMAL[NJIN] = {"---", "---", "---", "---", "---", "---", "---", "(NOISE)", "(LFO)", "(-5V)",
+static const char *const JIN_NORMAL[NJIN] = {"---", "---", "---", "---", "---", "---", "---", "(VCO)", "(LFO)", "(-5V)",
     "---", "(+5V)", "---"};
 
 enum {
@@ -57,6 +57,8 @@ enum {
     P_LFO_SYNC, P_CLK_DIV, P_CLK_WIDTH,
     /* 0.3.2: white noise (not on the reference panel): its level into the VCF's input, with the VCO (or the folder) */
     P_NOISE,
+    /* 0.5 (the user): the cutoff's fine tuning, +-2 semitones (EDIT > VCF, knob 3); the LFO RATE's (LFO, knob 4) */
+    P_CUT_FINE, P_LFO_FINE,
     NPARAM
 };
 #define NPARAM_01 45u                           /* 0.1's parameters (its programs: the name at 45; fmav1.c converts them) */
@@ -86,7 +88,7 @@ typedef struct {
 /* how a value shows (param_value) */
 enum { K_NUM, K_TEN, K_BTEN, K_CUT, K_ATT, K_DR, K_PITCH, K_FINE, K_WAVE, K_PW, K_MMIX, K_LWAVE, K_LRATE, K_VCAMODE,
        K_GLIDE, K_KBSCL, K_JACK, K_PRIO, K_RETRIG, K_BEND, K_ARP, K_AOCT, K_ADIV, K_PCT, K_ONOFF, K_CTYPE, K_CHZ, K_CHMS,
-       K_DDIV, K_LHZ, K_HHZ, K_RMS, K_SYNC, K_CDIV };
+       K_DDIV, K_LHZ, K_HHZ, K_RMS, K_SYNC, K_CDIV, K_CFINE };
 
 #define NDIVS 19u                               /* the note values, slow to fast (the arp takes a part) */
 static const char *const DIV_NAME[NDIVS] = {"8/1", "4/1", "2/1", "1/1", "1/2D", "1/2", "1/2T", "1/4D", "1/4", "1/4T",
@@ -101,22 +103,22 @@ static const uint8_t DIV_DEN[NDIVS] = {1, 1, 1, 1, 1, 1, 3, 2, 1, 3, 4, 2, 3, 8,
 
 #define JACK_DEF(i, nm) [PJ(i)] = {nm, NJSRC - 1, J_NONE, K_JACK, 0}
 static const pdef_t PDEF[NPARAM] = {
-    [P_CUTOFF] = {"CUTOFF", 127, 64, K_CUT, 74},
-    [P_RES] = {"RESONANCE", 127, 64, K_TEN, 71},
+    [P_CUTOFF] = {"CUTOFF", 127, 127, K_CUT, 74},   /* (0.5, the user: INIT open, attack / decay / release 0, sustain full) */
+    [P_RES] = {"RESONANCE", 127, 0, K_TEN, 71},   /* (0.5, the user: INIT at 0) */
     [P_VCF_AMT] = {"VCF MOD AMT", 127, 64, K_BTEN, 0},
-    [P_VCF_MIX] = {"VCF MOD MIX", 127, 64, K_MMIX, 0},
+    [P_VCF_MIX] = {"VCF MOD MIX", 127, 0, K_MMIX, 0},   /* (0.5, the user: INIT all EG; the factory programs set it) */
     [P_ATTACK] = {"ATTACK", 127, 0, K_ATT, 73},
-    [P_DECAY] = {"DECAY", 127, 64, K_DR, 75},
-    [P_SUSTAIN] = {"SUSTAIN", 127, 85, K_TEN, 0},
-    [P_RELEASE] = {"RELEASE", 127, 64, K_DR, 72},
-    [P_WAVE] = {"VCO WAVE", 127, 64, K_WAVE, 0},
-    [P_PW] = {"PULSE WIDTH", 127, 64, K_PW, 0},
+    [P_DECAY] = {"DECAY", 127, 0, K_DR, 75},
+    [P_SUSTAIN] = {"SUSTAIN", 127, 127, K_TEN, 0},
+    [P_RELEASE] = {"RELEASE", 127, 0, K_DR, 72},
+    [P_WAVE] = {"VCO WAVE", 127, 0, K_WAVE, 0},   /* (0.5, the user: INIT on the saw; the factory programs set it) */
+    [P_PW] = {"PULSE WIDTH", 127, 127, K_PW, 0},   /* (0.5, the user: INIT at 50 %; the factory programs keep 64) */
     [P_PITCH] = {"PITCH", 120, 60, K_PITCH, 0},
-    [P_VCO_MIX] = {"VCO MOD MIX", 127, 64, K_MMIX, 0},
+    [P_VCO_MIX] = {"VCO MOD MIX", 127, 0, K_MMIX, 0},   /* (0.5, the user: INIT all EG; the factory programs set it) */
     [P_PITCH_AMT] = {"PITCH MOD AMT", 127, 0, K_TEN, 0},
     [P_PWM_AMT] = {"PWM AMT", 127, 0, K_TEN, 0},
     [P_LFO_RATE] = {"LFO RATE", 127, 64, K_LRATE, 0},
-    [P_LFO_WAVE] = {"LFO WAVE", 127, 64, K_LWAVE, 0},
+    [P_LFO_WAVE] = {"LFO WAVE", 127, 0, K_LWAVE, 0},   /* (0.5, the user: INIT the triangle; the factory programs set it) */
     [P_VOLUME] = {"VOLUME", 127, 100, K_TEN, 0},
     [P_VCA_MODE] = {"VCA MODE", 1, VCA_EG, K_VCAMODE, 0},
     [P_GLIDE] = {"GLIDE", 127, 0, K_GLIDE, 5},
@@ -126,7 +128,7 @@ static const pdef_t PDEF[NPARAM] = {
     [P_ATTN] = {"ATTENUATOR", 127, 0, K_TEN, 0},
     [P_FINE] = {"FINE", 100, 50, K_FINE, 0},
     JACK_DEF(I_1VOCT, "1V/OCT"), JACK_DEF(I_PWM, "PWM"), JACK_DEF(I_CUTOFF, "CUTOFF"), JACK_DEF(I_VCACV, "VCA CV"),
-    JACK_DEF(I_LFORATE, "LFO RATE"), JACK_DEF(I_GATE, "GATE"), JACK_DEF(I_FOLD, "FOLD IN"), JACK_DEF(I_SHIN, "S+H (NOISE)"),
+    JACK_DEF(I_LFORATE, "LFO RATE"), JACK_DEF(I_GATE, "GATE"), JACK_DEF(I_FOLD, "FOLD IN"), JACK_DEF(I_SHIN, "S+H (VCO)"),
     JACK_DEF(I_SHGATE, "S+H GATE"), JACK_DEF(I_ONE, "ONE (-5)"), JACK_DEF(I_TWO, "TWO"), JACK_DEF(I_ATTN, "ATTN (+5)"),
     JACK_DEF(I_MULT, "MULT"),
     [P_PRIO] = {"PRIO", NPR - 1, PR_LOW, K_PRIO, 0},
@@ -162,12 +164,12 @@ static const pdef_t PDEF[NPARAM] = {
     [P_CLK_DIV] = {"CLOCK", NCLKDIV - 1, 11, K_CDIV, 0},   /* 1/8 */
     [P_CLK_WIDTH] = {"GATE", 127, 64, K_PCT, 0},
     [P_NOISE] = {"NOISE", 127, 0, K_TEN, 0},     /* 0.3.2 */
+    [P_CUT_FINE] = {"CUT FINE", 127, 64, K_CFINE, 0},   /* 0.5: 64 = 0, +-200 cents (fine8) */
+    [P_LFO_FINE] = {"RATE FINE", 127, 64, K_CFINE, 0},  /* 0.5: the same */
 };
-/* the INITIAL PATCH above is the manual's (its page 14: VCO WAVE, PULSE WIDTH, both MOD MIXes, CUTOFF, RESONANCE, LFO
- * RATE and WAVE, DECAY, RELEASE at 12 o'clock, SUSTAIN at 2, the rest at 0). 0.1's defaults were others: its factory
- * programs are lists over those, so they start from them (bit-identical: tests/mfm_programs.txt against 0.1's render) */
-static const uint8_t FACT_BASE_01[] = {P_CUTOFF, 104, P_RES, 0, P_VCF_MIX, 0, P_DECAY, 70, P_SUSTAIN, 127, P_RELEASE, 40,
-    P_WAVE, 0, P_VCO_MIX, 127, P_LFO_RATE, 60, P_LFO_WAVE, 0, P_ATTN, 64, 255};
+/* INIT (the defaults above, 0.5: the user's, set by the reference's): the saw, PULSE WIDTH 50 %, both MOD MIXes on
+ * EG, the LFO a triangle, CUTOFF open, RESONANCE 0, ATTACK, DECAY, RELEASE 0, SUSTAIN full. The factory programs list
+ * what differs from it (0.5: no more 0.1's base under them) */
 
 /* the values' names (7 characters at most: a knob's LCD) */
 static const char *const PRIO_NAME[NPR] = {"LOW", "LAST", "HIGH"};
@@ -182,7 +184,7 @@ static const uint8_t CT_RATE[3] = {52, 61, 100}, CT_DEPTH[3] = {94, 94, 13};   /
 /* 0.3 (the user): VCA OUT is the audio out (the headphones are in it): no cable from it; the mult is gone (its input
  * takes nothing, its outputs are offered to no one) */
 #define JB(s) (1u << (s))
-#define JD_ALL (JB(J_VCA) | JB(J_MULT1) | JB(J_MULT2))
+#define JD_ALL (JB(J_VCA) | JB(J_MULT1) | JB(J_MULT2) | JB(J_CLOCK))   /* (0.5: no CLOCK output) */
 static const uint32_t JIN_DENY[NJIN] = {
     [I_1VOCT] = JD_ALL | JB(J_VCO), [I_PWM] = JD_ALL | JB(J_VCO), [I_CUTOFF] = JD_ALL, [I_VCACV] = JD_ALL,
     [I_LFORATE] = JD_ALL | JB(J_LFO), [I_GATE] = JD_ALL | JB(J_EG), [I_FOLD] = JD_ALL, [I_SHIN] = JD_ALL | JB(J_SH),
@@ -191,14 +193,17 @@ static const uint32_t JIN_DENY[NJIN] = {
 #undef JB
 static int jack_ok(uint32_t in, uint32_t src) { return src < NJSRC && in < NJIN && !(JIN_DENY[in] >> src & 1u); }
 /* a cable an older program has that 0.3 offers no more: from a mult -> from what the mult took; from VCA OUT -> none */
-/* (0.4) S+H IN with no cable takes the white noise; older programs took the VCO: one that uses the S+H with no cable in
- * S+H IN gets the cable VCO > S+H IN, so it sounds as it did */
-static void patch_keep_sh_vco(uint8_t *v)
+/* (0.5) S+H IN with no cable takes the VCO again (the reference's normal); 0.4 .. 0.5's first builds took the white
+ * noise: a program saved then that uses the S+H with no cable in S+H IN gets the cable NOISE > S+H IN, so it sounds
+ * as it did */
+static void patch_keep_sh_noise(uint8_t *v)
 {
     uint32_t i, uses = 0;
     for (i = 0; i < NJIN; i++) uses |= v[PJ(i)] == J_SH;
-    if (uses && v[PJ(I_SHIN)] == J_NONE) v[PJ(I_SHIN)] = J_VCO;
+    if (uses && v[PJ(I_SHIN)] == J_NONE) v[PJ(I_SHIN)] = J_NOISE;
 }
+/* (0.5) CUT FINE's and RATE FINE's offset, Q8 semitones: 64 = 0, 63 steps each side to +-2 semitones (0 clamps as 1) */
+static inline int32_t fine8(uint32_t v) { int32_t o = ((int32_t)v - 64) * 512 / 63; return o < -512 ? -512 : o; }
 static void patch_fix_values(uint8_t *v)      /* (0.3.2) a value out of its range (a slot not set: 0xFF) -> its default */
 {
     uint32_t i;
@@ -233,7 +238,6 @@ static void patch_from_factory(patch_t *p, const factory_t *f)
     const uint8_t *s = f->set;
     uint32_t i;
     patch_defaults(p);
-    for (i = 0; FACT_BASE_01[i] != 255u; i += 2) p->v[FACT_BASE_01[i]] = FACT_BASE_01[i + 1];
     while (s[0] != 255u) { p->v[s[0]] = s[1]; s += 2; }
     for (i = 0; i < PATCH_NAME; i++) p->v[PNAME_AT + i] = ' ';
     for (i = 0; i < PATCH_NAME && f->name[i]; i++) p->v[PNAME_AT + i] = (uint8_t)f->name[i];

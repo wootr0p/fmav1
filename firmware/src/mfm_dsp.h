@@ -11,7 +11,8 @@
  *    twice the rate.
  *  - the VCF: the four-pole transistor ladder (after FMini-1's ladder, Ruppert, GPL-3.0: four
  *    differential pairs, the emphasis network's lag pole, the loop predicted from the states), its coefficients each
- *    sample when the cutoff moves.
+ *    sample when the cutoff moves. Since 0.5 each stage saturates its own state too (ours, from the equations of
+ *    A. Huovilainen, DAFx 2004, and S. D'Angelo and V. Valimaki, ICASSP 2013), its laws fitted to our recordings.
  * From OberVave: the polyBLEP event, the tanh table, the pitch.
  *
  * Signals: the patchbay's in volts, Q12 (1 V = 4096: the VCO swings +-5 V = +-20480); the ladder's own unit is
@@ -107,15 +108,23 @@ static inline __attribute__((always_inline)) int32_t mvco_tick(mvco_t *v, uint32
 
 /* ================================================================== the LFO */
 typedef struct { uint32_t ph; int32_t prev; } mlfo_t;
+/* (0.5, the user's scope on the reference) the triangle: its bottom at 0, rising over LFO_RISE of the turn (58 %),
+ * falling over the rest; the square is high while it rises, so halfway it steps at the triangle's peaks */
+static inline __attribute__((always_inline)) int32_t lfo_tri(uint32_t ph)
+{
+    int32_t t = ph < LFO_RISE ? (int32_t)(((ph >> 17) * LFO_KU) >> 15) - 32768
+                              : 32767 - (int32_t)((((ph - LFO_RISE) >> 17) * LFO_KD) >> 15);
+    return t < -32768 ? -32768 : t > 32767 ? 32767 : t;
+}
 /* one sample: w the square's share (Q15); out +-32768, the previous sample (the square band-limited) */
 static inline __attribute__((always_inline)) int32_t mlfo_tick(mlfo_t *l, uint32_t inc, int32_t w)
 {
     uint32_t old = l->ph, ph = old + inc, d = inc >> 15;
-    int32_t p = (int32_t)((ph + 0x40000000u) >> 15), tri = p < 65536 ? p - 32768 : 98303 - p;
-    int32_t sq = ph < 0x80000000u ? 32767 : -32768, cur = ((tri * (32768 - w)) >> 15) + ((sq * w) >> 15), out = l->prev;
+    int32_t tri = lfo_tri(ph);
+    int32_t sq = ph < LFO_RISE ? 32767 : -32768, cur = ((tri * (32768 - w)) >> 15) + ((sq * w) >> 15), out = l->prev;
     if (w && d) {
         if (ph < old) osc_event(&out, &cur, 2 * w, (int32_t)(ph / d));
-        if (ph >= 0x80000000u && old < 0x80000000u) osc_event(&out, &cur, -2 * w, (int32_t)((ph - 0x80000000u) / d));
+        if (ph >= LFO_RISE && (old < LFO_RISE || ph < old)) osc_event(&out, &cur, -2 * w, (int32_t)((ph - LFO_RISE) / d));
     }
     l->ph = ph; l->prev = cur;
     return out;
@@ -147,6 +156,9 @@ static inline __attribute__((always_inline)) int32_t fold_tick(fold_t *f, int32_
 }
 
 /* ================================================================== the VCF: the transistor ladder */
+#ifndef LADDER_DIFF
+#define LADDER_DIFF 1                           /* (0.5) 1: each stage's state through a tanh too (B); 0: 0.5's first ladder (A) */
+#endif
 typedef struct { int32_t s0, s1, s2, s3, sx, yp; } lad_t;
 typedef struct { int32_t G, gx, c0, c1, c2, c3, inv, kinv, tr; } ladc_t;
 static inline uint32_t g4_of(int32_t G16)
@@ -190,10 +202,22 @@ static inline __attribute__((always_inline)) int32_t ladder_tick(lad_t *f, const
     fbc = sx + mulr(S * 256 - sx, c->gx);       /* what the stages hold, through the lag pole (Q8) */
     u = ((in * c->inv) >> 14) - ((c->kinv * ((fbc + 128) >> 8)) >> 12);
     xin = softclip(u) * 256;                    /* each stage a differential pair: a tanh in front of it */
+#if LADDER_DIFF
+    /* (0.5) and a tanh on its own state, the pair's other half: dV/dt ~ tanh(Vin) - tanh(V) (the transistor ladder's
+     * equation, Huovilainen 2004, D'Angelo & Valimaki 2013), in the trapezoidal stage: the same filter while small,
+     * the stages compress as the real ones when driven (the resonance, the whistle, the bass) */
+#define LTH(s) (softclip(((s) + 128) >> 8) * 256)
+    v = mulr(xin - LTH(s0), G); y1 = v + s0; s0 = y1 + v;
+    v = mulr(LTH(y1) - LTH(s1), G); y2 = v + s1; s1 = y2 + v;
+    v = mulr(LTH(y2) - LTH(s2), G); y3 = v + s2; s2 = y3 + v;
+    v = mulr(LTH(y3) - LTH(s3), G); y4 = v + s3; s3 = y4 + v;
+#undef LTH
+#else
     v = mulr(xin - s0, G); y1 = v + s0; s0 = y1 + v;
     v = mulr((softclip((y1 + 128) >> 8) * 256) - s1, G); y2 = v + s1; s1 = y2 + v;
     v = mulr((softclip((y2 + 128) >> 8) * 256) - s2, G); y3 = v + s2; s2 = y3 + v;
     v = mulr((softclip((y3 + 128) >> 8) * 256) - s3, G); y4 = v + s3; s3 = y4 + v;
+#endif
     v = mulr(y4 - sx, c->gx); sx += v + v;      /* the lag pole follows the output */
     f->s0 = s0; f->s1 = s1; f->s2 = s2; f->s3 = s3; f->sx = sx;
     f->yp = (((y4 + 128) >> 8) * c->tr) >> 12;

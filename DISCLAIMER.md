@@ -24,7 +24,7 @@ non solo) le garanzie di commerciabilità, di idoneità a uno scopo particolare 
 
 **Lo installi e lo usi interamente a tuo rischio.** Installare un firmware non ufficiale può lasciare l'apparecchio
 incapace di avviarsi ("brickato"), fargli perdere i dati salvati o farlo funzionare diversamente da come previsto dal
-costruttore. In nessun caso l'autore o chi ha contribuito rispondono di pretese, danni o perdite, diretti o indiretti,
+costruttore. In nessun caso gli autori o chi ha contribuito rispondono di pretese, danni o perdite, diretti o indiretti,
 derivanti dall'uso di FMav-1 o degli strumenti che lo accompagnano, compresi danni all'M-VAVE FM-1 o ad altri
 apparecchi, perdita di dati o danni all'udito (tieni il volume ragionevole: un sintetizzatore può essere forte, e alcuni
 programmi suonano anche senza note).

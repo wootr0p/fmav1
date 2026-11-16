@@ -1,7 +1,9 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-only
 # FMav-1's host tests (no hardware). Run from the repo root after ./build.sh:
-#   sh build.sh && sh tests/run_tests.sh      (~25 min; QUICK=1: ~8 min, the sanitizers skip the 90 programs)
+#   sh build.sh && sh tests/run_tests.sh      (QUICK=1: the sanitizers skip the 90 programs)
+# (0.5) Each step prints "[k/N] its share done, the time so far" and how long it took; the sanitizers run in parallel
+# (tests/sanitize.sh, one run a core) and print their own "[done/total]".
 # The app on the host (every factory program, every page, the panel's switches, four tracks, the CPU worst case), the
 # sanitizers with a fuzz, the platform pieces kept from OberVave (MASTER glide, CPU meter), the update path (ota.c, the
 # loader, tools/fm1_install.py).
@@ -12,18 +14,30 @@ OUT=build/host
 mkdir -p "$OUT"
 CC="${CC:-cc} -O1 -Wall -Wno-unused-function"
 fail=0
-run() { echo "== $1"; shift; "$@" || fail=1; }
+N=$(grep -c '^run ' "$0")                       # (the steps: every line that starts with run)
+k=0
+T0=$(date +%s)
+mmss() { echo "$(($1 / 60))m$(printf %02d $(($1 % 60)))s"; }
+run() {
+    k=$((k + 1)); t=$(date +%s)
+    echo "== [$k/$N] $((100 * (k - 1) / N))%, $(mmss $((t - T0))): $1"; shift
+    if "$@"; then echo "   ok ($(mmss $(($(date +%s) - t))))"; else echo "   FAILED ($(mmss $(($(date +%s) - t))))"; fail=1; fi
+}
 
 [ -f build/fmav1.fwsc ] || { echo "run ./build.sh first"; exit 1; }
 
 run "the app on the host: every factory program plays (build/host/programs.wav)" sh tests/run_host.sh tests/mfm_programs.txt programs
 run "every section, every page, a note held (build/host/nav-*.png)" sh tests/run_host.sh tests/mfm_nav.txt nav
 run "the panel: SELECT pressed on each page, cables in and out, undo, random, save, presets, hold, arp (build/host/ui-*.png)" sh tests/run_host.sh tests/mfm_ui.txt ui
+det() {   # (0.5) two histories, then the same keys: the same screens, byte for byte (tools/gen_ui_tests.py)
+    sh tests/run_host.sh tests/mfm_det_a.txt det_a >/dev/null && sh tests/run_host.sh tests/mfm_det_b.txt det_b >/dev/null || return 1
+    for s in 7000 7300 8000 8700 9000 9300; do cmp -s "$OUT/det_a-$s.png" "$OUT/det_b-$s.png" || { echo "page differs at $s ms"; return 1; }; done
+}
+run "the navigation is deterministic: the same keys, the same page, whatever came before" det
 run "four tracks: channels N .. N+3, ALGORITHM, the mixer (build/host/tracks-*.png)" sh tests/run_host.sh tests/mfm_tracks.txt tracks
 run "the worst case on four tracks: everything at audio rate on each, chorus, delay and reverb" sh tests/run_host.sh tests/mfm_cpu.txt cpu4
 run "the screens for the manual: a lead's pages, the patchbay (build/host/screens-*.png)" sh tests/run_host.sh tests/mfm_screens.txt screens
 run "the one-track build (MFM_NTRK=1): every factory program plays" env MFM_NTRK=1 sh tests/run_host.sh tests/mfm_programs.txt programs1
-run "sanitizers (ASan + UBSan) on every script and a parameter fuzz, one track and four" sh tests/sanitize.sh
 
 $CC -o "$OUT/enc_test" tests/enc_test.c
 run "the knobs: fast turns (up to 300 clicks/s) every click counted, a still knob never steps" "$OUT/enc_test"
@@ -42,5 +56,8 @@ $CC -o "$OUT/ldr_test" tests/ldr_test.c
 run "update loader (FM-1): other app -> this build" "$OUT/ldr_test" "$OUT/old.fwsc" build/fmav1.fwsc
 run "installer (tools/fm1_install.py): install and the update-mode resume check the model" python3 tests/install_test.py
 
-[ "$fail" = 0 ] && echo "ALL TESTS PASSED" || echo "SOME TESTS FAILED"
+# (0.5, the user) the sanitizers last: they need none of the steps above, and they are the long one
+run "sanitizers (ASan + UBSan) on every script and a parameter fuzz, one track and four" sh tests/sanitize.sh
+
+[ "$fail" = 0 ] && echo "ALL TESTS PASSED in $(mmss $(($(date +%s) - T0)))" || echo "SOME TESTS FAILED ($(mmss $(($(date +%s) - T0))))"
 exit "$fail"

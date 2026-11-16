@@ -42,6 +42,10 @@ typedef struct {
     /* the EG */
     uint32_t eg_stage;
     int32_t eg, eg0;                            /* this block's end and start (Q24, ENV_ONE = 8 V) */
+    uint32_t eg_ph;                             /* (0.5) the attack's phase, Q24 of its rise (ATT_SHAPE) */
+    int32_t eg_hold;                            /* (0.5) the level a new gate found, going on (release or decay) until the
+                                                 * attack, from 0, passes it; 0: none */
+    uint8_t eg_hold_dec;                        /* (it was decaying toward the sustain, else releasing) */
     uint8_t gate_hi, gate_rise, sh_hi, idle;    /* the GATE jack's and the S+H GATE's Schmitt triggers */
     /* the voice */
     mvco_t vco;
@@ -51,7 +55,9 @@ typedef struct {
     ladc_t lc;
     int32_t lc_key;                             /* the ladder's coefficients are for this cutoff / resonance */
     uint32_t nrnd;                              /* (0.3.2) the white noise's generator (xorshift), one a track */
+    uint32_t lseed;                             /* (0.5) the ladder's own hiss (an LCG), so it sings from silence */
     int32_t sh;                                 /* the S+H's held voltage */
+    int32_t acx, acy;                           /* (0.5) the VCF input's AC coupling: the last input, the output (Q8) */
     int32_t o[NJSRC];                           /* the outputs, volts (Q12), as they are now */
     int32_t cut_sm, res_sm, pw_sm, wave_sm, lw_sm;   /* the knobs, slewed (a CC's steps glide), Q8 */
     int32_t drift[2];                           /* the analog wander: the VCO, the VCF */
@@ -122,7 +128,7 @@ static uint32_t div_frames(uint32_t quarter, uint32_t div)   /* a note value in 
 #include "mfm_fx.h"
 
 /* ---- the clock's place (0.3): MIDI clocks, Q20, wrapping at 2304 (every note value's whole clocks divide it, so a
- * synced LFO, the CLOCK output and the arp never jump at the wrap). It runs at the tempo (the MIDI clock's measured, else
+ * synced LFO and the arp never jump at the wrap). It runs at the tempo (the MIDI clock's measured, else
  * TEMPO); while a MIDI clock comes in it stays between the last clock and the next (never ahead, never behind), and
  * Start puts it at 0 (the first clock after Start is the first beat). Once a control block */
 #define CLK_WRAP (2304u << 20)
@@ -343,24 +349,41 @@ static void arp_tick(track_t *t)
     if (a->sounding && pv[P_ARP_GATE] < 127u && a->cnt >= gate_len) { t->kgate = 0; a->sounding = 0; }
 }
 
-/* ---- the EG, a block at a time (Q24): the attack aims past the top (an RC charging toward 1.3) and turns at it, the
- * decay falls toward the SUSTAIN and stays there (the knob moves it, at the decay's pace), the release falls to 0.
- * A new gate starts the attack from where the level is (no click) */
+/* ---- the EG, a block at a time (Q24): the attack rises by ATT_SHAPE in ATTACK's time (an RC toward 1.11 x the top,
+ * the reference's), the decay falls toward the SUSTAIN and stays there (the knob moves it, at the decay's pace), the
+ * release falls to 0. A new gate starts the attack from 0, as the reference's: the level it found goes on (released,
+ * or decaying) and is heard until the attack passes it (0.5, the user's scope: at a slow attack a quick gate on a held
+ * level waits, or does nothing) */
 static void eg_tick(track_t *t, const uint8_t *pv, int gate, int trig)
 {
-    int32_t sus = pv[P_SUSTAIN] * (ENV_ONE / 127);
-    if (trig || (gate && (t->eg_stage == E_IDLE || t->eg_stage == E_REL))) t->eg_stage = E_ATT;
-    if (!gate && (t->eg_stage == E_ATT || t->eg_stage == E_DEC)) t->eg_stage = E_REL;
+    int32_t sus = (int32_t)SUS_Q15[pv[P_SUSTAIN] & 127u] * (ENV_ONE >> 15);   /* (0.5: its curve, KNOB) */
+    if (trig || (gate && (t->eg_stage == E_IDLE || t->eg_stage == E_REL))) {
+        t->eg_hold = t->eg_stage == E_IDLE ? 0 : t->eg;
+        t->eg_hold_dec = t->eg_stage == E_DEC || (t->eg_stage == E_ATT && t->eg_hold_dec);
+        t->eg_stage = E_ATT; t->eg_ph = 0;
+    }
+    if (!gate && (t->eg_stage == E_ATT || t->eg_stage == E_DEC)) { t->eg_stage = E_REL; t->eg_hold = 0; }
     switch (t->eg_stage) {
-    case E_ATT:
-        t->eg += (int32_t)(((int64_t)(ENV_ONE + (ENV_ONE * 3 >> 3) - t->eg) * (int32_t)ENV_K_ATT[pv[P_ATTACK] & 127u]) >> 24);
-        if (t->eg >= ENV_ONE) { t->eg = ENV_ONE; t->eg_stage = E_DEC; }
+    case E_ATT:                                 /* (0.5) along ATT_SHAPE from 0, its phase a step a block */
+        t->eg_ph += ATT_DPH[pv[P_ATTACK] & 127u];
+        if (t->eg_ph >= (1u << 24)) { t->eg = ENV_ONE; t->eg_stage = E_DEC; t->eg_hold = 0; break; }
+        {
+            uint32_t i = t->eg_ph >> 16, f = t->eg_ph & 0xFFFFu, s0 = ATT_SHAPE[i];
+            t->eg = (int32_t)((s0 + (((ATT_SHAPE[i + 1u] - s0) * f) >> 16)) << 9);
+        }
+        if (t->eg_hold > 0) {                   /* the level found, going on as it was, heard while above the attack */
+            if (t->eg_hold_dec)
+                t->eg_hold += (int32_t)(((int64_t)(sus - t->eg_hold) * (int32_t)ENV_K_DEC[pv[P_DECAY] & 127u]) >> 24);
+            else
+                t->eg_hold += (int32_t)(((int64_t)(0 - t->eg_hold) * (int32_t)ENV_K_REL[pv[P_RELEASE] & 127u]) >> 24) - 32;
+            if (t->eg_hold > t->eg) t->eg = t->eg_hold; else t->eg_hold = 0;
+        }
         break;
     case E_DEC:
-        t->eg += (int32_t)(((int64_t)(sus - t->eg) * (int32_t)ENV_K_DR[pv[P_DECAY] & 127u]) >> 24);
+        t->eg += (int32_t)(((int64_t)(sus - t->eg) * (int32_t)ENV_K_DEC[pv[P_DECAY] & 127u]) >> 24);
         break;
     case E_REL:
-        t->eg += (int32_t)(((int64_t)(0 - t->eg) * (int32_t)ENV_K_DR[pv[P_RELEASE] & 127u]) >> 24) - 32;
+        t->eg += (int32_t)(((int64_t)(0 - t->eg) * (int32_t)ENV_K_REL[pv[P_RELEASE] & 127u]) >> 24) - 32;
         if (t->eg < LEVEL_FLOOR) { t->eg = 0; t->eg_stage = E_IDLE; }
         break;
     default:
@@ -371,16 +394,12 @@ static void eg_tick(track_t *t, const uint8_t *pv, int gate, int trig)
 /* the knobs' laws */
 static inline int32_t sq_q15(uint32_t v) { return (int32_t)(v * v * 2u); }   /* 0..127 -> 0..~1 square law, Q15 (a log pot) */
 static inline int32_t lin_q15(uint32_t v) { return (int32_t)(v * 258u); }    /* 0..127 -> 0..~1, Q15 */
-static inline int32_t bip_sq_q15(uint32_t v)    /* VCF MOD AMT: 64 = 0, +-1 at the ends, finer near 0 */
-{
-    int32_t d = (int32_t)v - 64;
-    d = d > 0 ? d * 520 : d * 512;              /* +-32767 */
-    return (d * (d < 0 ? -d : d)) >> 15;
-}
+/* VCF MOD AMT: 64 = 0, +-1 at the ends, finer near 0 (0.5: |x| ^ 1.5, VCF_AMT_LAW in tools/gen_tables.py; it was
+ * the square) */
+static inline int32_t vcf_amt_q15(uint32_t v) { return VCF_AMT_Q15[v & 127u]; }
 /* the duty of PULSE WIDTH (Q16 of the turn): 5 % (0) .. 50 % (127, a square); the PWM input moves it 4.5 % a volt
  * (the manual: 10 Vpp from the middle sweeps ~5 .. ~50 %), here within 1 .. 99 % */
-#define DUTY_MIN16 3277                         /* 5 % */
-#define DUTY_SPAN16 29491                       /* to 50 % */
+/* (DUTY_MIN16, DUTY_SPAN16: PULSE WIDTH's ends, KNOB in tools/gen_tables.py) */
 #define DUTY_PER_V16 2949                       /* 4.5 % a volt */
 
 /* ---- one block (CTL frames) of a track, added into out (stereo). The patchbay a sample at a time */
@@ -391,6 +410,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
     uint32_t i, gate, lfo_inc = 0, nz_on;
     int32_t kb8, kbcv, scl, p_base, c_base, deg, vco_mx, vcf_mx, pamt, wamt, famt, vol, attn, one, fg, gl, gr, pos, nlev;
     int32_t lfo_p8, lw, ww, duty0;
+    uint32_t woke;                              /* (0.5) back from idle this block */
     uint8_t jk[NJIN];
     for (i = 0; i < NJIN; i++) jk[i] = (uint8_t)(jack_ok(i, pv[PJ(i)]) ? pv[PJ(i)] : 0u);   /* (never its own output) */
     /* the keyboard: the glide (an RC lag), KB SCALE (1 .. 5 octaves an octave: the low C of the panel's keys is 0 V,
@@ -401,7 +421,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
         else t->kb16 += (int32_t)(((int64_t)diff * GLIDE_K[pv[P_GLIDE] & 127u]) >> 16);
     }
     kb8 = (t->kb16 >> 8) - 60 * 256;
-    scl = 4096 + (int32_t)pv[P_KB_SCALE] * 4 * 4096 / 127;   /* Q12, 1 .. 5 */
+    scl = KBS_LO12 + (int32_t)pv[P_KB_SCALE] * KBS_SPAN12 / 127;   /* Q12 octaves (KNOB: 1 .. 5) */
     kbcv = (((kb8 * 4) / 3) * scl) >> 12;       /* Q8 semitones -> volts (12 * 256 = 1 V = 4096) x KB SCALE */
     o[J_KBCV] = kbcv;
     /* the MIDI sources (not on the reference panel): 0 .. +5 V */
@@ -424,7 +444,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
     t->wave_sm += (((int32_t)pv[P_WAVE] << 8) - t->wave_sm) >> 3;
     t->lw_sm += (((int32_t)pv[P_LFO_WAVE] << 8) - t->lw_sm) >> 3;
     /* the LFO: its rate a pitch (LFO_P8), the LFO RATE input 1 V an octave */
-    lfo_p8 = LFO_P8[pv[P_LFO_RATE] & 127u];
+    lfo_p8 = LFO_P8[pv[P_LFO_RATE] & 127u] + fine8(pv[P_LFO_FINE]);   /* (0.5: RATE FINE, +-2 semitones) */
     if (!jk[I_LFORATE]) lfo_inc = pitch_inc(lfo_p8);
     if (pv[P_LFO_SYNC]) {                       /* (0.3) SYNC: a note value of the clock, its phase the clock's place */
         uint32_t tk = DIV_TICKS((pv[P_LFO_SYNC] - 1u) % NCLKDIV), inc = (clk_adv << 12) / (tk * CTL);
@@ -432,11 +452,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
         else lfo_p8 = p8_of_inc(inc);           /* (a cable on LFO RATE: the CV around the synced rate, free) */
     }
     ui_lfo_inc[ti] = jk[I_LFORATE] ? pitch_inc(lfo_p8) : lfo_inc;
-    {                                           /* (0.3) CLOCK: high for GATE of each note value of the clock; DUMMY 0 V */
-        uint32_t tk = DIV_TICKS(pv[P_CLK_DIV] % NCLKDIV);
-        o[J_CLOCK] = ((clk_pos % (tk << 20)) >> 8) < (((tk << 12) * (pv[P_CLK_WIDTH] + 1u)) >> 7) ? 5 * VOLT : 0;
-        o[J_DUMMY] = 0;
-    }
+    o[J_CLOCK] = o[J_DUMMY] = 0;               /* DUMMY 0 V (0.5: no CLOCK output; its slot stays, never patched) */
     lw = (t->lw_sm * 258) >> 8;                 /* (Q15) */
     /* nothing to hear: the EG at rest, the VCA closed (its MODE on EG, no cable on VCA CV or GATE). The LFO and the VCO
      * run on (free-running), the S+H keeps what it holds */
@@ -449,22 +465,27 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
         t->amp = 0; ui_amp[ti] = 0; ui_note[ti] = 255u; t->idle = 1;
         return 0;
     }
+    woke = t->idle;
     t->idle = 0;
     ui_note[ti] = t->note;
     /* the pitch: PITCH (+-5 octaves), FINE, the keyboard's CV, the bend, the tune, the wander; per sample: 1V/OCT and
      * the VCO MOD */
     deg = (t->drift[0] * pv[P_DRIFT]) >> 13;
-    p_base = 60 * 256 + ((int32_t)pv[P_PITCH] - 60) * 256 + ((int32_t)pv[P_FINE] - 50) * 256 / 100 + ((kbcv * 3) >> 2)
+    p_base = 60 * 256 + PITCH_P8[pv[P_PITCH] % 121u] + ((int32_t)pv[P_FINE] - 50) * 256 / 100 + ((kbcv * 3) >> 2)
            + (ctl_bend[ti] * (int32_t)pv[P_BEND] * 256 >> 13) + ctl_tune8 + deg;
     vco_mx = lin_q15(pv[P_VCO_MIX]);            /* EG (0) .. LFO (32767) */
     vcf_mx = lin_q15(pv[P_VCF_MIX]);
     pamt = sq_q15(pv[P_PITCH_AMT]);             /* full: 1 V an octave of the mix */
     wamt = lin_q15(pv[P_PWM_AMT]);              /* full: 4.5 % a volt of the mix (as the PWM jack) */
-    famt = bip_sq_q15(pv[P_VCF_AMT]);           /* full: 1 V an octave of the mix (EG at its top: +8 octaves) */
+    famt = vcf_amt_q15(pv[P_VCF_AMT]);           /* full: 1 V an octave of the mix (EG at its top: +8 octaves) */
     ww = (t->wave_sm * 258) >> 8;
     duty0 = DUTY_MIN16 + t->pw_sm * DUTY_SPAN16 / (127 * 256);
     /* the cutoff: 30 Hz .. 20 kHz over the knob, the wander */
-    c_base = CUT_LO8 + (t->cut_sm >> 4) * (CUT_SPAN8 >> 3) / 254 + ((t->drift[1] * pv[P_DRIFT]) >> 11);
+    {                                           /* (the slewed knob, between two of the table's steps) */
+        int32_t ci = clampi(t->cut_sm >> 8, 0, 127), cf = t->cut_sm & 255;
+        c_base = CUT_P8[ci] + (((CUT_P8[ci + 1] - CUT_P8[ci]) * cf) >> 8) + ((t->drift[1] * pv[P_DRIFT]) >> 11)
+               + fine8(pv[P_CUT_FINE]);   /* (0.5: the fine, +-2 semitones) */
+    }
     vol = sq_q15(pv[P_VOLUME]);                 /* (a log pot) */
     attn = lin_q15(pv[P_ATTN]);
     one = lin_q15(pv[P_ONE_LVL]);
@@ -474,6 +495,11 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
     pos = clampi(ctl_pan[ti], -64, 64) + 64;    /* (the track's pan, from the mixer; x 2: the middle is +3 dB, 5 V out of
                                                  * the VCA ~-1 dBFS) */
     gl = PAN_Q12[128 - pos] * 2; gr = PAN_Q12[pos] * 2;
+    /* (0.5) the hardware's ladder is never quite silent (its transistors' noise): with RESONANCE past the singing
+     * point it starts on its own, with nothing in it. Here a hiss of ~-90 dB into its first stage once a block (the
+     * user: no white noise in the programs; 0.4.1's whistle took a breath of NOISE to start) */
+    t->lseed = t->lseed * 1664525u + 1013904223u;
+    t->lad.s0 += (t->lseed >> 31) ? 256 : -256;   /* (one step of its 16-bit unit: under it the stages round it away) */
     for (i = 0; i < CTL; i++) {
         int32_t eg = t->eg0 + (int32_t)(((t->eg - t->eg0) >> 4) * (int32_t)i), egv = eg >> 9, lfo, mv, p8, x, y, c8, g, s, d16;
         uint32_t li;
@@ -488,17 +514,23 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
         p8 = p_base + ((mv * 3 * (pamt >> 1)) >> 16);
         if (jk[I_1VOCT]) p8 += (o[jk[I_1VOCT]] * 3) >> 2;
         p8 = clampi(p8, -1 * 256, 135 * 256);   /* (8 Hz .. 16 kHz and a little) */
-        /* the width: the knob, the PWM input, the PWM AMT of the mix (4.5 % a volt both), 1 .. 99 % */
+        /* the width: the knob, the PWM input, the PWM AMT of the mix (4.5 % a volt both), 0 .. 50 % (0.5, the user:
+         * fully right is a square, the EG held up or not; the user's recording of the reference, the LFO's PWM on a
+         * narrow pulse: under 0 % the pulse vanishes, silent for part of each cycle. It was 1 .. 99 %: past 50 % the
+         * pulse narrowed again, and it never went silent). At 0 the rise and the fall fall on one instant: none */
         d16 = ((mv * (wamt >> 1)) >> 14) + (jk[I_PWM] ? o[jk[I_PWM]] : 0);
-        d16 = clampi(duty0 + ((clampi(d16, -20 * VOLT, 20 * VOLT) * DUTY_PER_V16) >> 12), 655, 64881);
+        d16 = clampi(duty0 + ((clampi(d16, -20 * VOLT, 20 * VOLT) * DUTY_PER_V16) >> 12), 0, DUTY_MIN16 + DUTY_SPAN16);
+        if (woke) { woke = 0; (void)mvco_tick(&t->vco, 0, (uint32_t)d16 << 16, ww); }   /* (0.5: its held sample,
+                                                 * at the phase it ran on to, not the one it stopped on) */
         x = mvco_tick(&t->vco, pitch_inc(p8), (uint32_t)d16 << 16, ww);
         o[J_VCO] = (x * 5) >> 3;                /* +-5 V */
         /* S+H: its gate the LFO (normal) or the jack, its input the VCO (normal) or the jack; it takes on the rise */
         {
             int32_t gv = o[jk[I_SHGATE] ? jk[I_SHGATE] : J_LFO];
             if (!t->sh_hi && gv > 5 * VOLT / 2) {
-                t->sh_hi = 1;                   /* (0.4: no cable in S+H IN: the white noise, drawn now if it is not running) */
-                t->sh = jk[I_SHIN] ? o[jk[I_SHIN]] : nz_on ? o[J_NOISE] : noise_one(&t->nrnd);
+                t->sh_hi = 1;                   /* (no cable in S+H IN: the VCO, the reference's normal; 0.4 .. 0.5's first
+                                                 * builds took the noise) */
+                t->sh = jk[I_SHIN] ? o[jk[I_SHIN]] : o[J_VCO];
                 ui_sh_hist[ti][ui_sh_n[ti] & 15u] = (int16_t)clampi(t->sh >> 2, -32767, 32767); ui_sh_n[ti]++;
             }
             else if (t->sh_hi && gv < VOLT) t->sh_hi = 0;
@@ -516,8 +548,17 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
             else if (t->gate_hi && gv < 3 * VOLT / 2) t->gate_hi = 0;
         }
         /* the VCF's input: FOLD IN patched -> the folder (the VCO bypassed), else the VCO */
-        x = jk[I_FOLD] ? fold_tick(&t->fold, o[jk[I_FOLD]], fg) : o[J_VCO];
+        x = jk[I_FOLD] ? fold_tick(&t->fold, o[jk[I_FOLD]], fg)   /* (0.5: the VCO without its pulse's offset, its
+                                                 * mean at this width: what the coupling below would leave, with no lag) */
+            : o[J_VCO] - (((((d16 - 32768) * ww) >> 15) * 5) >> 3);
         if (nlev) x += (o[J_NOISE] * nlev) >> 15;   /* (0.3.2) the noise, mixed in with its level */
+        {                                       /* (0.5) AC-coupled (~7 Hz), as the hardware's: the pulse's offset never
+                                                 * reaches the ladder, so CUTOFF fully counterclockwise is silent and the
+                                                 * VCA opens on no step (no click) */
+            t->acy = clampi(t->acy + (x - t->acx) * 256 - (((t->acy >> 4) * 34) >> 11), -(1 << 28), 1 << 28);
+            t->acx = x;
+            x = t->acy >> 8;
+        }
         /* the cutoff: the knob, the CUTOFF input (1 V an octave), the VCF MOD (the EG / LFO mix x the bipolar AMT) */
         mv = egv + (((o[J_LFO] - egv) * (vcf_mx >> 1)) >> 14);
         c8 = c_base + ((((mv * 3) >> 2) * (famt >> 1)) >> 14);
@@ -527,7 +568,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
             int32_t key = (c8 >> 4) | (t->res_sm >> 4) << 16;   /* (new coefficients past 1/16 semitone) */
             if (key != t->lc_key) { t->lc_key = key; ladder_coef(&t->lc, c8, t->res_sm); }
         }
-        y = ladder_tick(&t->lad, &t->lc, (x * 7) >> 3);   /* (5 V = 17920 of the ladder's unit: the VCO drives it a
+        y = ladder_tick(&t->lad, &t->lc, (x * LAD_IN_Q8) >> 8);   /* (LADDER_DRIVE_DB; 0 dB: 5 V = 17920 of the ladder's unit: the VCO drives it a
                                                  * little, the mixer's 8 V more) */
         y = (y * 73) >> 6;                      /* (back to volts) */
         /* the VCA: the EG (MODE EG) or open (ON), plus the VCA CV input (0 .. 8 V), x VOLUME */
@@ -580,7 +621,8 @@ static void engine_audio(int32_t *out, uint32_t n)
     if (!engine_ready) return;
     for (i = 0; i < 2u * n; i++) mbus[i] = dsend[i] = 0;
     for (i = 0; i < n; i++) rsend[i] = csend[i] = 0;
-    for (ti = 0; ti < NTRK; ti++) {             /* the choruses; the delay / reverb of the first track that has them on;
+    for (ti = 0; ti < NTRK; ti++) {             /* the chorus, the delay, the reverb: one each, shared (the first track
+                                                 * that has it on sets its knobs);
                                                  * each sound's sends (Q15) */
         const uint8_t *v = trk[ti].p->v;
         uint32_t on = !ctl_fx_off;              /* (0.3: REC off: every effect off, the sounds' switches as they are) */

@@ -35,7 +35,7 @@ Ogni parametro del suono ha una CC diretta e un numero NRPN (CC 99 = 0, CC 98 = 
 | 42 | 28 | PATCHBAY: il cavo in LFO RATE |
 | 43 | 29 | PATCHBAY: il cavo in GATE |
 | 44 | 30 | PATCHBAY: il cavo in FOLD IN |
-| 45 | 31 | PATCHBAY: il cavo in S+H IN (senza cavo: NOISE) |
+| 45 | 31 | PATCHBAY: il cavo in S+H IN (senza cavo: VCO) |
 | 46 | 32 | PATCHBAY: il cavo in S+H GATE |
 | 47 | 33 | PATCHBAY: il cavo in ONE |
 | 48 | 34 | PATCHBAY: il cavo in TWO |
@@ -71,9 +71,11 @@ Ogni parametro del suono ha una CC diretta e un numero NRPN (CC 99 = 0, CC 98 = 
 | 81 | 64 | REVERB DIFFUSION * |
 | 82 | 65 | REVERB WIDTH * |
 | 83 | 66 | LFO SYNC (FREE, 8/1 .. 1/32T) * |
-| 84 | 67 | CLOCK: valore di nota (8/1 .. 1/32T) * |
-| 85 | 68 | CLOCK GATE (durata dell'impulso) * |
+| 84 | 67 | (non usato dalla 0.5: era il CLOCK) |
+| 85 | 68 | (non usato dalla 0.5: era il GATE del CLOCK) |
 | 86 | 69 | NOISE: il rumore bianco nel VCF * |
+| 87 | 70 | VCF CUTOFF FINE (64 = 0, +-2 semitoni) * |
+| 88 | 71 | LFO RATE FINE (64 = 0, +-2 semitoni) * |
 
 ## I cavi via MIDI
 
@@ -93,8 +95,7 @@ La CC di una presa (38-49) sceglie da quale uscita arriva il suo cavo. Il valore
 | VELO * | 86 |
 | MODWHL * | 94 |
 | PRESS * | 101 |
-| CLOCK * | 109 |
 | DUMMY (spina sola: 0 V, niente normalizzazione) * | 116 |
 | NOISE (rumore bianco) * | 124 |
 
-Un valore che una presa non accetta (un'uscita del suo stesso modulo, VCA OUT, i vecchi MULT) toglie il cavo.
+Un valore che una presa non accetta (un'uscita del suo stesso modulo, VCA OUT, i vecchi MULT) toglie il cavo (anche il vecchio CLOCK, tolto nella 0.5).

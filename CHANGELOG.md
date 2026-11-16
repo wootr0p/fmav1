@@ -1,5 +1,75 @@
 # Changelog
 
+## 0.5 (2026-11-16)
+
+Every knob calibrated against the reference instrument (the user's recordings, scope captures and photos of its panel),
+the 90 programs rebuilt from INIT so they can be set up on it, and the panel reorganised.
+
+### The sound, calibrated to the reference instrument
+
+- **The knobs turn as the reference panel's**: drawn from 7 to 5 o'clock (300 degrees, was 270), eleven ticks on the
+  hours (the big knobs: a tick every 10 degrees). A knob set at 2 o'clock on the panel is set here at its 2 o'clock
+  tick. Every law is in one table, `KNOB` at the top of `tools/gen_tables.py` (a value at 7 o'clock, at any hours in
+  between, at 5 o'clock, and "exp" or "lin").
+- **A more faithful ladder**: each stage saturates its own state as well as its input, as the transistor pairs do
+  (dV/dt ~ tanh(Vin) - tanh(V): Huovilainen 2004, D'Angelo & Valimaki 2013); ~8 % more CPU in the worst case. Fitted
+  to the reference's recordings (its INIT, a C2 saw, five CUTOFF / RESONANCE settings): the -3 dB corner at ~24, 289
+  and ~4800 Hz at 9 o'clock, noon and 3; the whistle at 2.12 times the corner; RESONANCE starts to whistle halfway
+  between 3 and 4 o'clock. Checked on the FM-1 itself (its USB audio): the harmonics within 0.7 dB open and 1.3 dB at
+  RESONANCE noon, the whistle 589 Hz (the reference's 583). CUTOFF at 10:28 is 95 Hz (a second recording).
+- **The ladder sings from silence**, as the hardware's: past the singing point it starts with nothing in it (a hiss
+  of one 16-bit step a block); under it, silence.
+- **CUTOFF fully counterclockwise is silent, with no click** (the pulse's DC no longer reaches the VCF).
+- **The EG**: ATTACK 0.8 ms .. 2.5 s on an RC curve aiming at 1.11 times the top, restarting from 0 at each new gate
+  as the reference's; DECAY 3 ms .. 16 s and RELEASE 3 ms .. 18 s in the reference's seconds; at noon ATTACK 153 ms,
+  DECAY 668 ms, RELEASE 627 ms; at 9 o'clock ATTACK 44 ms, DECAY 437 ms, RELEASE 330 ms; SUSTAIN 13 % at 9 o'clock,
+  48 % at noon, linear above.
+- **VCF MOD AMT** follows |x|^1.5 (was the square: 3.3 octaves at 2:48).
+- **The LFO**: 0.165 .. 550 Hz, 4.7 Hz at noon; between triangle and square as the reference's (the square high while
+  the triangle rises: halfway it steps at the peaks), both skewed 58 / 42.
+- **The pulse width runs 0 .. 50 %** (knob, PWM AMT and the PWM jack; it was 1 .. 99 %): fully right is always a square,
+  and a modulation under 0 % silences the pulse, as the reference does.
+- **S+H IN's normal is the VCO again**, as the reference panel says (S+H (VCO)); programs saved by 0.4 .. 0.5's
+  first builds that sampled the noise get a NOISE > S+H IN cable and sound as before.
+- **The CLOCK output is gone** (the reference panel has none); LFO SYNC, the arpeggiator and the delay still follow the
+  clock. A saved cable from CLOCK becomes no cable; CC 84 and 85 do nothing.
+
+### The programs
+
+- **The 90 factory programs rebuilt from INIT**: each lists only the knobs its sound needs (every other one at INIT's
+  where the simulator heard no difference) and uses only what the reference panel has, the effects aside (no white
+  noise, no VELO / MODWHL / PRESS cable, no FINE, ANALOG, arp or LFO SYNC), so each can be set up on the reference from
+  its INIT by turning only the knobs listed (`firmware/src/mfm_patches.h`, in the panel's order). Their sounds are
+  0.4.1's, each knob moved to the same Hz, time and level on the new curves, the levels as 0.4.1's. The noise programs
+  (37 NOISE HIT, 69 CLOCK HATS, 79 WIND, 81 SNARE, 82 HI-HAT, 83 CLAP) make their noise with the VCO and the LFO
+  modulating each other at audio rate; the rhythmic ones have their LFO free at the rate it had at 120 bpm; 42 ARP
+  PLUCK and 70 SYNC ARP no longer arpeggiate, 59 WHEEL LEAD no longer takes the wheel.
+- **A new order**: 01 BRASS LEAD, 02 CLASSIC LEAD, 03 CLASSIC BASS, 04 PWM LEAD, 05 FOLDED TRI, 06 DOTTED LEAD, then
+  the others in their old order. The four tracks start on 01, 11, 21, 31 (first power-on, the memory's reset).
+- **CLASSIC BASS** on the reference's own knobs (a photo, and the laws fitted to its recording); **BRASS LEAD** with
+  the user's EG and LFO RATE.
+- **INIT** (91-99, SAVE + F3) as the reference's: the saw, PULSE WIDTH 50 %, both MOD MIXes on EG, the LFO a triangle,
+  CUTOFF open, RESONANCE 0, ATTACK, DECAY, RELEASE 0, SUSTAIN full.
+
+### The panel
+
+- **The buttons reorganised**: HOME opens the MIXER (levels, then pans), then KEYBOARD, VOICE, GLOBAL; EDIT the VCO;
+  GLO the VCF; the PERFORM pages are gone.
+- **Deterministic navigation** (for the blind, and muscle memory): a section's button opens its first page, pressed
+  again its next one (pressed N times = page N); SELECT stops at the first and the last page; EDIT and SAVE act on
+  their release however long they were held. The guide has the map of every page.
+- **FX**: the delay first, then the reverb, then the chorus.
+- **CUT FINE** (GLO, the VCF's third knob) and **RATE FINE** (LFO, fourth knob): +-2 semitones of fine tuning
+  (CC 87 / NRPN 70, CC 88 / NRPN 71). Not on the reference panel.
+- **ARP pressed again** no longer turns the arp on / off: its MODE knob does.
+- **The memory's reset**: SAVE held + G5 asks "RESET ALL MEMORY?", OCT+ confirms (anything else, or 8 s, cancels):
+  every saved program and setting goes and the FM-1 restarts as on its first install.
+- **The LEDs**: HOLD lights PLAY green; the LFO button no longer blinks with the LFO (its LED is on the screen); fixed:
+  REC's LED (the effects on) stayed dark after power-on.
+- **The patchbay cables bow across their line**: a cable between two jacks of one column no longer runs straight
+  over the others (the sides alternate), and parallel cables never coincide.
+- **The version on the boot screen.**
+
 ## 0.4.1 (2026-11-14)
 
 - **The clock's source**: GLOBAL > **CLOCK** = **INTERNAL** (the TEMPO knob; every MIDI clock and Start / Stop is

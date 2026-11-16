@@ -25,14 +25,16 @@ NAME = {
     "P_DL_PING": "DELAY PING-PONG *", "P_RV_ON": "REVERB ON *", "P_RV_SEND": "REVERB SEND *", "P_RV_DECAY": "REVERB DECAY *",
     "P_RV_DAMP": "REVERB DAMP *", "P_RV_PRE": "REVERB PRE-DELAY *", "P_RV_DIFF": "REVERB DIFFUSION *",
     "P_RV_WIDTH": "REVERB WIDTH *",
-    "P_LFO_SYNC": "LFO SYNC (FREE, 8/1 .. 1/32T) *", "P_CLK_DIV": "CLOCK: valore di nota (8/1 .. 1/32T) *",
-    "P_CLK_WIDTH": "CLOCK GATE (durata dell'impulso) *",
+    "P_LFO_SYNC": "LFO SYNC (FREE, 8/1 .. 1/32T) *", "P_CLK_DIV": "(non usato dalla 0.5: era il CLOCK)",
+    "P_CLK_WIDTH": "(non usato dalla 0.5: era il GATE del CLOCK)",
     "P_NOISE": "NOISE: il rumore bianco nel VCF *",
+    "P_CUT_FINE": "VCF CUTOFF FINE (64 = 0, +-2 semitoni) *",
+    "P_LFO_FINE": "LFO RATE FINE (64 = 0, +-2 semitoni) *",
 }
-JIN = ["1V/OCT", "PWM", "CUTOFF", "VCA CV", "LFO RATE", "GATE", "FOLD IN", "S+H IN (senza cavo: NOISE)", "S+H GATE", "ONE", "TWO", "ATTN",
+JIN = ["1V/OCT", "PWM", "CUTOFF", "VCA CV", "LFO RATE", "GATE", "FOLD IN", "S+H IN (senza cavo: VCO)", "S+H GATE", "ONE", "TWO", "ATTN",
        "(MULT: non c'è più, ignorata)"]
 JSRC = ["nessun cavo", None, "KB CV", "VCO", "LFO", "EG", "S+H", "ONE", "ONE+TWO", "ATTN", None, None, "VELO *",
-        "MODWHL *", "PRESS *", "CLOCK *", "DUMMY (spina sola: 0 V, niente normalizzazione) *", "NOISE (rumore bianco) *"]   # (None: not offered)
+        "MODWHL *", "PRESS *", None, "DUMMY (spina sola: 0 V, niente normalizzazione) *", "NOISE (rumore bianco) *"]   # (None: not offered)
 
 
 def names():
@@ -68,7 +70,7 @@ def main():
     for s, name in enumerate(JSRC):
         if name:
             print(f"| {name} | {cc_value(P['P_JACK'], s, mx)} |")
-    print("\nUn valore che una presa non accetta (un'uscita del suo stesso modulo, VCA OUT, i vecchi MULT) toglie il cavo.")
+    print("\nUn valore che una presa non accetta (un'uscita del suo stesso modulo, VCA OUT, i vecchi MULT) toglie il cavo (anche il vecchio CLOCK, tolto nella 0.5).")
 
 
 if __name__ == "__main__":

@@ -62,9 +62,9 @@ typedef struct {
 static settings_t set;
 #define SET_SIZE_02 __builtin_offsetof(settings_t, fx_off)   /* (0.2's save: up to pan) */
 enum { CLK_INT, CLK_USB, CLK_TRS };             /* (0.4.1, the user: the tempo internal, or synced over USB or the TRS) */
-static const uint8_t TPROG_DEF[4] = {0, 10, 20, 30};   /* (CLASSIC BASS, CLASSIC LEAD, S+H FILTER, KICK) */
+static const uint8_t TPROG_DEF[4] = {0, 10, 20, 30};   /* (0.5, the user: the tracks start on 01, 11, 21, 31, at
+                                                 * first power-on and after the memory's reset) */
 static uint32_t set_dirty, set_t;
-#define LFO_STEADY_LED 1947846u                 /* ~20 Hz: the LFO button's LED lit steady over it */
 #define LFO_STEADY_SCR 779138u                  /* ~8 Hz: the screen's (30 frames a second) */
 
 /* every button and key a little lit, always (the LED driver's backlight layer); GLOBAL page 2: LIGHTS */
@@ -79,7 +79,10 @@ static void lights_apply(void)
 }
 
 #define PS_N 40u                                /* programs a sector */
-#define PS_TAG 0x344D464Du                      /* "MFM4": 0.3.2's layout (the name at PNAME_AT, spare slots 0xFF) */
+#define PS_TAG 0x364D464Du                      /* "MFM6": 0.5's (S+H IN's normal the VCO again) */
+#define PS_TAG_05 0x354D464Du                   /* "MFM5": 0.5's first builds (S+H IN's normal the noise) */
+#define PS_TAG_04 0x344D464Du                   /* "MFM4": 0.4 .. 0.4.1's, the layout of now (the name at PNAME_AT, spare
+                                                 * slots 0xFF): only ATTACK converted (ATT_FROM_04) */
 #define PS_TAG_03 0x334D464Du                   /* "MFM3": 0.3 / 0.3.1's (patch_from_03) */
 #define PS_TAG_02 0x324D464Du                   /* "MFM2": 0.2's (patch_from_02) */
 #define PS_TAG_01 0x504D464Du                   /* "MFMP": 0.1's (patch_from_01) */
@@ -98,7 +101,6 @@ static void patch_from_01(patch_t *p)
     patch_defaults(&q);
     for (i = 0; i < NPARAM_01; i++) q.v[i] = p->v[i];
     for (i = 0; i < PATCH_NAME; i++) q.v[PNAME_AT + i] = p->v[NPARAM_01 + i];
-    patch_keep_sh_vco(q.v);                     /* (0.4: the S+H's normal is the noise now) */
     *p = q;
 }
 /* a program saved by 0.2: its 66 parameters, the clock's at their defaults, the name moved from 66 to NPARAM */
@@ -109,7 +111,6 @@ static void patch_from_02(patch_t *p)
     patch_defaults(&q);
     for (i = 0; i < NPARAM_02; i++) q.v[i] = p->v[i];
     for (i = 0; i < PATCH_NAME; i++) q.v[PNAME_AT + i] = p->v[NPARAM_02 + i];
-    patch_keep_sh_vco(q.v);                     /* (0.4: the S+H's normal is the noise now) */
     *p = q;
 }
 /* a program saved by 0.3 / 0.3.1: its 69 parameters, the noise off, the name moved from 69 to its fixed place */
@@ -120,9 +121,10 @@ static void patch_from_03(patch_t *p)
     patch_defaults(&q);
     for (i = 0; i < NPARAM_03; i++) q.v[i] = p->v[i];
     for (i = 0; i < PATCH_NAME; i++) q.v[PNAME_AT + i] = p->v[NPARAM_03 + i];
-    patch_keep_sh_vco(q.v);                     /* (0.4: the S+H's normal is the noise now) */
     *p = q;
 }
+/* (0.5) an ATTACK set before 0.5 (0.8 ms .. 5.5 s): the same time on the knob now (slower than 2.5 s: its top) */
+static void patch_from_04(patch_t *p) { p->v[P_ATTACK] = ATT_FROM_04[p->v[P_ATTACK] & 127u]; }
 static int prog_used(uint32_t n) { return (int)(psect[n / PS_N].used[(n % PS_N) >> 5] >> (n % 32u) & 1u); }
 static void prog_get(uint32_t n, patch_t *p)    /* program n: the user's, else the factory's, else INIT */
 {
@@ -173,24 +175,31 @@ enum { AC_PERF, AC_VCO, AC_VCF, AC_ENV, AC_LFO, AC_UTL, AC_JACK, AC_GLOB, AC_FX 
  * a hint for the footer */
 typedef struct { const char *title; uint8_t npg, acc; int8_t tab; uint8_t gr[5]; const char *sub[5]; int16_t p[5][4]; const char *hint; } item_t;
 
-static const item_t IT_PERF[] = {
-    {"PERFORM", 3, AC_PERF, TAB_NONE, {G_VCF, G_VCO, G_SCOPE}, {0, 0, 0},
-        {{P_CUTOFF, P_RES, P_VCF_AMT, P_DECAY}, {P_WAVE, P_PW, P_LFO_RATE, P_GLIDE}, {P_PITCH_AMT, P_PWM_AMT, P_FOLD, P_VOLUME}},
-        "SELECT: THE|NEXT PAGES"},
+/* (0.5, the user) HOME: the mixer (the levels, then the pans), then what GLO had (KEYBOARD, VOICE, GLOBAL); the three
+ * PERFORM pages gone. EDIT: the VCO; GLO: the VCF */
+static const item_t IT_HOME[] = {
 #if NTRK > 1
     {"MIXER", 2, AC_PERF, TAB_NONE, {G_TRACKS, G_TRACKS}, {"LEVELS", "PANS"},
         {{V_LVL1, V_LVL1 + 1, V_LVL1 + 2, V_LVL1 + 3}, {V_PAN1, V_PAN1 + 1, V_PAN1 + 2, V_PAN1 + 3}}, "ALGORITHM:|THE TRACK"},
 #else
     {"MIXER", 1, AC_PERF, TAB_NONE, {G_TRACKS}, {0}, {{V_LVL1, V_PAN1, NONE, NONE}}, "THE TRACK'S|LEVEL AND PAN"},
 #endif
+    {"KEYBOARD", 1, AC_GLOB, TAB_NONE, {G_KB}, {0}, {{P_KB_SCALE, P_GLIDE, P_PRIO, P_RETRIG}},
+        "LOW NOTE,|LEGATO: CLASSIC"},
+    {"VOICE", 1, AC_GLOB, TAB_NONE, {G_SCOPE}, {0}, {{P_BEND, P_DRIFT, NONE, NONE}}, "ANALOG: THE|DRIFT"},
+    {"GLOBAL", 2, AC_GLOB, TAB_NONE, {G_SCOPE, G_SCOPE}, {0, 0}, {{V_MIDICH, V_TUNE, V_CLKSRC, V_TEMPO}, {V_KVEL, V_LIGHTS, NONE, NONE}},
+        NTRK > 1 ? "CH N: TRACK 1|N+1: TRACK 2 .." : "MIDI CH: THE|TRACK'S CHANNEL"},
 };
-/* (0.4, the user: no knob twice but on PERFORM) the cables only on SEQ, TEMPO only on GLOBAL */
+#define HOME_GLOBAL 3u                          /* IT_HOME's GLOBAL (its CPU meter) */
+/* (0.4, the user: no knob twice) the cables only on SEQ, TEMPO only on GLOBAL */
 static const item_t IT_EDIT[] = {
     {"VCO", 2, AC_VCO, TAB_VCO, {G_VCO, G_VMOD}, {0, "MOD"},
         {{P_PITCH, P_WAVE, P_PW, P_FINE}, {P_VCO_MIX, P_PITCH_AMT, P_PWM_AMT, NONE}},
         "WAVE: SAW >|MIX > PULSE"},
-    {"VCF", 1, AC_VCF, TAB_VCF, {G_VCF}, {"LADDER"},
-        {{P_CUTOFF, P_RES, P_VCF_MIX, P_VCF_AMT}},
+};
+static const item_t IT_VCF[] = {                /* (0.5, the user: on GLO) */
+    {"VCF", 2, AC_VCF, TAB_VCF, {G_VCF, G_VCF}, {"LADDER", "MOD"},   /* (0.5, the user: CUT FINE by the cutoff, the MODs after) */
+        {{P_CUTOFF, P_RES, P_CUT_FINE, NONE}, {P_VCF_MIX, P_VCF_AMT, NONE, NONE}},
         "KEY TRACKING: SEQ|KB CV > CUTOFF"},
 };
 static const item_t IT_ENV[] = {
@@ -198,10 +207,8 @@ static const item_t IT_ENV[] = {
     {"VCA", 1, AC_ENV, TAB_VCA, {G_VCA}, {0}, {{P_VOLUME, P_VCA_MODE, NONE, NONE}}, "MODE ON:|A DRONE"},
 };
 static const item_t IT_LFO[] = {
-    {"LFO", 1, AC_LFO, TAB_LFO, {G_LFO}, {0}, {{P_LFO_RATE, P_LFO_WAVE, P_LFO_SYNC, NONE}},
+    {"LFO", 1, AC_LFO, TAB_LFO, {G_LFO}, {0}, {{P_LFO_RATE, P_LFO_WAVE, P_LFO_SYNC, P_LFO_FINE}},   /* (0.5: RATE FINE) */
         "SYNC: LOCKED|TO THE CLOCK"},
-    {"CLOCK", 1, AC_LFO, TAB_LFO, {G_CLK}, {"MIDI / TEMPO"}, {{P_CLK_DIV, P_CLK_WIDTH, NONE, NONE}},
-        "PATCH CLOCK|INTO ANY INPUT"},
 };
 static const item_t IT_PATCH[] = {             /* SEQ (0.3.1: two items, SEQ again switches): the whole patchbay; its 12
                                                  * inputs on knobs, in the panel's order */
@@ -216,30 +223,25 @@ static const item_t IT_UTL[] = {               /* SELECT pressed (0.3): the util
     {"UTILITIES", 1, AC_UTL, TAB_UTL, {G_FOLD}, {0}, {{P_FOLD, P_ONE_LVL, P_ATTN, P_NOISE}},
         "CABLES: SEQ|VCO > FOLD IN"},
 };
-static const item_t IT_FX[] = {                 /* FX: the chorus, the delay and the reverb (shared, a send each) */
-    {"CHORUS", 2, AC_FX, TAB_FX, {G_CHO, G_CHO}, {0, 0}, {{P_CH_ON, P_CH_TYPE, P_CH_MIX, NONE}, {P_CH_RATE, P_CH_DEPTH, NONE, NONE}},
-        "REC: EVERY|EFFECT OFF / ON"},
+static const item_t IT_FX[] = {                 /* FX: the delay, the reverb (shared, a send each) and the chorus (0.5,
+                                                 * the user: the delay first, the quickest to reach; draw_page's ON[]
+                                                 * follows this order) */
     {"DELAY", 3, AC_FX, TAB_FX, {G_DLY, G_DLY, G_DLY}, {0, 0, 0}, {{P_DL_ON, P_DL_SEND, P_DL_TIMEL, P_DL_TIMER},
         {P_DL_FB, P_DL_PING, P_DL_WIDTH, NONE}, {P_DL_LOW, P_DL_HIGH, NONE, NONE}}, "REC: EVERY|EFFECT OFF / ON"},
     {"REVERB", 2, AC_FX, TAB_FX, {G_REV, G_REV}, {0, 0}, {{P_RV_ON, P_RV_SEND, P_RV_DECAY, P_RV_DAMP},
         {P_RV_PRE, P_RV_DIFF, P_RV_WIDTH, NONE}}, "REC: EVERY|EFFECT OFF / ON"},
+    {"CHORUS", 2, AC_FX, TAB_FX, {G_CHO, G_CHO}, {0, 0}, {{P_CH_ON, P_CH_TYPE, P_CH_MIX, NONE}, {P_CH_RATE, P_CH_DEPTH, NONE, NONE}},
+        "REC: EVERY|EFFECT OFF / ON"},
 };
 static const item_t IT_ARP[] = { {"ARPEGGIATOR", 1, AC_GLOB, TAB_NONE, {G_ARP}, {0},
-    {{P_ARP_MODE, P_ARP_OCT, P_ARP_RATE, P_ARP_GATE}}, "ARP: ON / OFF|MIDI CLOCK: SYNC"} };
-static const item_t IT_GLO[] = {
-    {"KEYBOARD", 1, AC_GLOB, TAB_NONE, {G_KB}, {0}, {{P_KB_SCALE, P_GLIDE, P_PRIO, P_RETRIG}},
-        "LOW NOTE,|LEGATO: CLASSIC"},
-    {"VOICE", 1, AC_GLOB, TAB_NONE, {G_SCOPE}, {0}, {{P_BEND, P_DRIFT, NONE, NONE}}, "ANALOG: THE|DRIFT"},
-    {"GLOBAL", 2, AC_GLOB, TAB_NONE, {G_SCOPE, G_SCOPE}, {0, 0}, {{V_MIDICH, V_TUNE, V_CLKSRC, V_TEMPO}, {V_KVEL, V_LIGHTS, NONE, NONE}},
-        NTRK > 1 ? "CH N: TRACK 1|N+1: TRACK 2 .." : "MIDI CH: THE|TRACK'S CHANNEL"},
-};
-enum { S_PERF, S_EDIT, S_ENV, S_LFO, S_FX, S_PATCH, S_ARP, S_GLO, S_UTL, NSEC };
+    {{P_ARP_MODE, P_ARP_OCT, P_ARP_RATE, P_ARP_GATE}}, "ON / OFF: MODE|MIDI CLOCK: SYNC"} };
+enum { S_HOME, S_EDIT, S_ENV, S_LFO, S_FX, S_PATCH, S_ARP, S_VCF, S_UTL, NSEC };
 typedef struct { const item_t *it; uint8_t n, btn; } section_t;
 static const section_t SEC[NSEC] = {
-    {IT_PERF, 2, BTN_HOME}, {IT_EDIT, 2, BTN_EDIT}, {IT_ENV, 2, BTN_ENV}, {IT_LFO, 2, BTN_LFO}, {IT_FX, 3, BTN_FX},
-    {IT_PATCH, 2, BTN_SEQ}, {IT_ARP, 1, BTN_ARP}, {IT_GLO, 3, BTN_GLO}, {IT_UTL, 1, BTN_SEL},
+    {IT_HOME, 4, BTN_HOME}, {IT_EDIT, 1, BTN_EDIT}, {IT_ENV, 2, BTN_ENV}, {IT_LFO, 1, BTN_LFO}, {IT_FX, 3, BTN_FX},
+    {IT_PATCH, 2, BTN_SEQ}, {IT_ARP, 1, BTN_ARP}, {IT_VCF, 1, BTN_GLO}, {IT_UTL, 1, BTN_SEL},
 };
-static uint32_t sec = S_PERF, sec_item[NSEC], item_pg[NSEC][8];
+static uint32_t sec = S_HOME, sec_item[NSEC], item_pg[NSEC][8];
 
 static const item_t *item_of(uint32_t s, uint32_t i) { return &SEC[s].it[i % SEC[s].n]; }
 static const item_t *cur_item(void) { return item_of(sec, sec_item[sec]); }
@@ -400,16 +402,26 @@ static void fmt_lhz(char *s, uint32_t h)        /* Hz x 100: 0.10Hz, 4.5Hz, 120H
     else fmt_u(s, h / 100u);
     scat(s, "Hz");
 }
-static uint32_t cut_hz(int32_t v)               /* the CUTOFF knob's frequency */
+static uint32_t cut_hz8(int32_t c8)             /* a cutoff (Q8 semitones, MIDI) in Hz */
 {
-    int32_t c8 = CUT_LO8 + v * 16 * (CUT_SPAN8 >> 3) / 254, i = clampi(c8 >> 8, 0, 135);
+    int32_t i = clampi(c8 >> 8, 0, 135);
+    c8 = clampi(c8, 0, 136 * 256 - 1);
     return CUT_HZ[i] + (uint32_t)(((int32_t)(CUT_HZ[i + 1] - CUT_HZ[i]) * (c8 & 255)) >> 8);
+}
+static uint32_t cut_hz(int32_t v) { return cut_hz8(CUT_P8[(uint32_t)v & 127u]); }   /* the CUTOFF knob's frequency */
+/* (0.5) the LFO's rate, Hz x 100, with RATE FINE: the knob's step x 2^(fine / 12 semitones), e^y to the cube (y within
+ * +-0.116: off by 1e-5 at most). The screen's only */
+static uint32_t lfo_hz_x100(const uint8_t *pv)
+{
+    int32_t y = fine8(pv[P_LFO_FINE]) * 14787 / 1000;   /* Q16: fine8 / (12 * 256) x ln 2, within +-7571 */
+    int32_t y2 = (y * y) >> 16, e = 65536 + y + (y2 >> 1) + ((y2 * y) >> 16) / 6;
+    return (LFO_HZ_X100[pv[P_LFO_RATE] & 127u] * (uint32_t)e + 32768u) >> 16;   /* (550 Hz x 1.12: within 32 bits) */
 }
 static int is_bip(int32_t id)
 {
     if (id == V_TUNE || (id >= V_PAN1 && id < V_PAN1 + 4)) return 1;
     if (id < 0 || id >= NPARAM) return 0;
-    return PDEF[id].kind == K_BTEN || PDEF[id].kind == K_PITCH || PDEF[id].kind == K_FINE;
+    return PDEF[id].kind == K_BTEN || PDEF[id].kind == K_PITCH || PDEF[id].kind == K_FINE || PDEF[id].kind == K_CFINE;
 }
 static void mix_name(char *s, int32_t v, const char *a, const char *b)   /* a crossfade knob: "EG", "LFO", "LFO 60%" */
 {
@@ -445,7 +457,8 @@ static void param_value(char *s, int32_t id, int32_t v)   /* <= 8 characters */
         }
     }
     switch (PDEF[id].kind) {
-    case K_TEN: fmt_frac(s, v * 100 / 127, 1, 0); break;   /* a classic dial, 0 .. 10 */
+    case K_TEN:                         /* a classic dial, 0 .. 10 (SUSTAIN: its level, KNOB's curve) */
+        fmt_frac(s, id == P_SUSTAIN ? SUS_Q15[v & 127] * 100 / 32767 : v * 100 / 127, 1, 0); break;
     case K_BTEN: fmt_frac(s, clampi((v - 64) * 50 / 63, -50, 50), 1, 1); break;   /* -5 .. +5 */
     case K_PCT: fmt_u(s, (uint32_t)v * 100u / 127u); scat(s, "%"); break;
     case K_ONOFF: scat(s, v ? "ON" : "OFF"); break;
@@ -458,17 +471,22 @@ static void param_value(char *s, int32_t id, int32_t v)   /* <= 8 characters */
     case K_RMS: fmt_ms(s, (uint32_t)v * 930u / 127u); break;
     case K_CUT: fmt_hz(s, cut_hz(v)); break;
     case K_ATT: fmt_ms(s, ATT_MS_X10[v & 127]); break;
-    case K_DR: fmt_ms(s, DR_MS_X10[v & 127]); break;
-    case K_PITCH: if (v == 60) scat(s, "0"); else { fmt_s(s, v - 60); scat(s, " st"); } break;
+    case K_DR: fmt_ms(s, (id == P_RELEASE ? REL_MS_X10 : DEC_MS_X10)[v & 127]); break;
+    case K_PITCH: {                     /* (semitones from the middle C, rounded: PITCH_P8, KNOB) */
+        int32_t st = PITCH_P8[(uint32_t)v % 121u], r = st < 0 ? -((-st + 128) >> 8) : (st + 128) >> 8;
+        if (!r) scat(s, "0"); else { fmt_s(s, r); scat(s, " st"); }
+        break;
+    }
     case K_FINE: fmt_s(s, v - 50); scat(s, "c"); break;
+    case K_CFINE: { int32_t c = fine8((uint32_t)v) * 100; fmt_s(s, c >= 0 ? (c + 128) / 256 : -((-c + 128) / 256)); scat(s, "c"); break; }   /* (0.5) cents, -200 .. +200 */
     case K_WAVE: mix_name(s, v, "SAW", "PULSE"); break;
-    case K_PW: fmt_u(s, (uint32_t)(5 + v * 45 / 127)); scat(s, "%"); break;
+    case K_PW: fmt_u(s, (uint32_t)(PW_LO_PCT + v * (PW_HI_PCT - PW_LO_PCT) / 127)); scat(s, "%"); break;
     case K_MMIX: mix_name(s, v, "EG", "LFO"); break;
     case K_LWAVE: mix_name(s, v, "TRI", "SQUARE"); break;
     case K_LRATE: fmt_lhz(s, LFO_HZ_X100[v & 127]); break;
     case K_VCAMODE: scat(s, v ? "ON" : "EG"); break;
     case K_GLIDE: if (v) fmt_ms(s, (uint32_t)GLIDE_MS[v & 127] * 10u); else scat(s, "OFF"); break;
-    case K_KBSCL: fmt_frac(s, 10 + v * 40 / 127, 1, 0); scat(s, " OCT"); break;
+    case K_KBSCL: fmt_frac(s, KBS_LO10 + v * KBS_SPAN10 / 127, 1, 0); scat(s, " OCT"); break;
     case K_JACK: if (v) scat(s, JSRC_NAME[v % NJSRC]); else scat(s, JIN_NORMAL[(id - P_JACK) % NJIN]); break;
     case K_PRIO: scat(s, PRIO_NAME[v % NPR]); break;
     case K_RETRIG: scat(s, v ? "ALWAYS" : "LEGATO"); break;
@@ -575,8 +593,10 @@ static void mutate_patch(void)                  /* a variation: the continuous k
 
 /* ---- the keys: notes, or (SAVE held) functions on the white keys */
 static const int8_t KEY_WHITE[27] = {0, -1, 1, -1, 2, -1, 3, 4, -1, 5, -1, 6, 7, -1, 8, -1, 9, -1, 10, 11, -1, 12, -1, 13, 14, -1, 15};
-static uint32_t layer_btn, layer_t, layer_used; /* a held button whose keys are functions: BTN_SAVE (else 0xFF) */
-static uint32_t edit_t, edit_used;              /* EDIT: pressed when, used as a modifier (undo / redo) */
+static uint32_t layer_btn, layer_used;          /* a held button whose keys are functions: BTN_SAVE (else 0xFF) */
+static uint32_t reset_armed, reset_t;           /* (0.5) GLO + G5: the memory's reset waits for OCT+ */
+static void memory_reset(void);
+static uint32_t edit_used;                      /* EDIT: used as a modifier (undo / redo) since pressed */
 static uint32_t keys_prev;
 static uint8_t key_note[27], key_fn[27], key_trk[27];
 
@@ -591,6 +611,11 @@ static void key_function(uint32_t k)
     int32_t w = KEY_WHITE[k];
     layer_used = 1;
     if (w < 0) return;
+    if (layer_btn == BTN_SAVE && k == 26u) {    /* (0.5) SAVE held + G5 (the last key): the memory's reset, asked (it was
+                                                 * GLO + G5; GLO is the VCF's button now) */
+        reset_armed = 1; reset_t = fm1_ms; dirty_hdr = 1; say("RESET ALL MEMORY?|OCT+: YES  OTHER: NO");
+        return;
+    }
     if (layer_btn == BTN_SAVE) {
         switch (w) {
         case 0: undo_keep(); patch_defaults(&live); mark_edited(); dirty_hdr = dirty_page = dirty_map = dirty_graph = 1; say("INIT"); break;
@@ -689,12 +714,12 @@ static void midi_in(uint32_t notes_only)
                 uint32_t q = ((eng_t - clk_t0) / 4u + 24u) / 48u * 48u, d;
                 if (q > FS / 5u && q < FS * 8u / 5u) {
                     d = q > ctl_ext_quarter ? q - ctl_ext_quarter : ctl_ext_quarter - q;
-                    if (!ctl_ext_quarter || d * 1000u > 3u * q) { ctl_ext_quarter = q; if (sec == S_GLO) dirty_page = 1; }
+                    if (!ctl_ext_quarter || d * 1000u > 3u * q) { ctl_ext_quarter = q; if (sec == S_HOME) dirty_page = 1; }
                 }
                 clk_n = 1; clk_t0 = eng_t;
             } else if (clk_n == 25u && !ctl_ext_quarter) {   /* (0.4.1) a first measure after one quarter */
                 uint32_t q = (eng_t - clk_t0 + 24u) / 48u * 48u;
-                if (q > FS / 5u && q < FS * 8u / 5u) { ctl_ext_quarter = q; if (sec == S_GLO) dirty_page = 1; }
+                if (q > FS / 5u && q < FS * 8u / 5u) { ctl_ext_quarter = q; if (sec == S_HOME) dirty_page = 1; }
             }
             continue;
         }
@@ -723,7 +748,7 @@ static void midi_in(uint32_t notes_only)
             else if (d1 == 120u || d1 == 123u) ctl_panic = 1;
             else if (d1 == 3u) {                /* (a diagnosis: the CPU, answered on channel 16; 1-16 / 17 also set
                                                  * the MIDI channel / OMNI, for tools/fm1_cpu.py) */
-                if (d2 >= 1u && d2 <= 17u) { set.midi_ch = (uint8_t)(d2 == 17u ? 0u : d2); set_dirty = 1; set_t = fm1_ms; if (sec == S_GLO) dirty_page = 1; }
+                if (d2 >= 1u && d2 <= 17u) { set.midi_ch = (uint8_t)(d2 == 17u ? 0u : d2); set_dirty = 1; set_t = fm1_ms; if (sec == S_HOME) dirty_page = 1; }
                 diag_req = 1;
             }
             else if (d1 == 99u) nrpn_msb[t] = d2;
@@ -760,10 +785,10 @@ static const char *tab_text(const item_t *it)   /* the box's tab: the module, as
 {
     static const char *const TT[NTAB] = {"VCO", "VCF", "EG", "VCA", "LFO", "UTL", "PATCH", "FX"};
     if (it->tab >= 0) return TT[it->tab % NTAB];
-    switch (sec) {
-    case S_PERF: return sec_item[S_PERF] ? "MIX" : "PERF";
-    case S_ARP: return "ARP";
-    default: return sec_item[S_GLO] == 0u ? "KB" : sec_item[S_GLO] == 1u ? "VOICE" : "GLO";
+    if (sec == S_ARP) return "ARP";
+    {                                           /* (HOME's items, 0.5) */
+        static const char *const HT[4] = {"MIX", "KB", "VOICE", "GLO"};
+        return HT[sec_item[S_HOME] % 4u];
     }
 }
 
@@ -865,16 +890,16 @@ static void draw_page(void)
     uint32_t k;
     if (on_patchbay()) { draw_patchbay(); return; }
     note[0] = 0;
-    if (sec == S_GLO && sec_item[S_GLO] == 2u) {   /* GLOBAL: the CPU (the slowest half of the last 2 s, of 5805 us) */
+    if (sec == S_HOME && sec_item[S_HOME] % SEC[S_HOME].n == HOME_GLOBAL) {   /* GLOBAL: the CPU (the slowest half of the last 2 s, of 5805 us) */
         if (cpu_m.over) { scat(note, "LATE "); fmt_u(note + 5, cpu_m.over); }
         else { fmt_u(note, cpu_m.peak); scat(note, " us"); }
     }
     if (sec == S_ENV && sec_item[S_ENV] % 2u == 1u) sub = live.v[P_VCA_MODE] ? "MODE ON" : "MODE EG";
     if (sec == S_FX) {                          /* the effect's ON, and REC's */
-        static const uint8_t ON[3] = {P_CH_ON, P_DL_ON, P_RV_ON};
+        static const uint8_t ON[3] = {P_DL_ON, P_RV_ON, P_CH_ON};   /* (IT_FX's order) */
         sub = set.fx_off ? "OFF (REC)" : live.v[ON[sec_item[S_FX] % 3u]] ? "ON" : "OFF";
     }
-    if (sec == S_LFO && sec_item[S_LFO] % 2u == 1u) {   /* (0.4.1) the clock's source and its state */
+    if (sec == S_LFO && live.v[P_LFO_SYNC]) {   /* (0.4.1) SYNC on: the clock's source and its state */
         static const char *const RUN[3] = {"TEMPO", "USB CLOCK", "TRS CLOCK"}, *const STOP[3] = {"TEMPO", "USB (STOPPED)", "TRS (STOPPED)"},
             *const NO[3] = {"TEMPO", "USB: NO CLOCK", "TRS: NO CLOCK"};
         uint32_t c = set.clk_src % 3u;
@@ -918,7 +943,6 @@ static void draw_graph(void)                    /* the page's picture, from the 
     case G_DLY: g_dly(live.v, c); break;
     case G_REV: g_rev(live.v, c); break;
     case G_TRACKS: g_tracks(ctrk); break;
-    case G_CLK: g_clk(live.v, c); break;
     case G_PATCH: {                             /* an INPUTS page: its four inputs and their cables */
         int16_t jp[4];
         uint32_t k;
@@ -950,7 +974,7 @@ static void draw_map(void)                      /* the foot: the keyboard and th
 /* one step of the animations: the levels move, what changed is drawn again (cheap strips only) */
 static void animate(void)
 {
-    uint32_t t, k, lfo_hi = trk[ctrk].lfo.ph < 0x80000000u, n = ui_note[ctrk], changed = 0;
+    uint32_t t, k, lfo_hi = trk[ctrk].lfo.ph < LFO_RISE, n = ui_note[ctrk], changed = 0;
     an_t = fm1_ms;
     an_led = (uint16_t)(lfo_hi ? 256u : an_led > 70u ? an_led - 70u : 0u);   /* (lit with the LFO, a short afterglow) */
     if (ui_lfo_inc[ctrk] > LFO_STEADY_SCR) an_led = 200u;   /* (0.3: faster than the screen shows: lit steady) */
@@ -984,48 +1008,61 @@ static void animate(void)
 /* ---- buttons */
 /* The panel (the user's rule): a section's button opens it, SELECT turned runs through ALL its pages
  * (every item's, one after the other), the four knobs are the page's; SELECT pressed is the UTL section's button (0.3).
- * Nothing else is needed to edit; the section's button pressed again turns to its next page, as SELECT (0.4; ARP again:
- * the arp on / off, its section has one page). */
-static void select_turn(int32_t e);
-static void go_section(uint32_t s)              /* a section's button: there, or (already there, 0.4) its next page, as
-                                                 * SELECT turned one detent */
+ * Nothing else is needed to edit; the section's button pressed again turns to its next page, as SELECT (0.4; 0.5, the
+ * user: ARP again no longer turns the arp on / off, its MODE knob does).
+ * (0.5, the user: deterministic, for the blind and for muscle memory: the same keys, the same page, whatever came
+ * before) a section's button from another section opens its FIRST page (no memory of the last one); pressed again, the
+ * next page, back to the first after the last ("pressed N times = page N"); SELECT turned stops at the first and the
+ * last page (turned far left: always the first); EDIT, GLO, SAVE act on their release however long they were held, if
+ * nothing used them as a modifier. */
+static void page_step(int32_t e, int wrap);
+static void go_section(uint32_t s)              /* a section's button: its first page, or (already there, 0.4) its next
+                                                 * page, the last one followed by the first */
 {
-    if (sec == s) { select_turn(1); return; }
+    uint32_t i;
+    if (sec == s) { page_step(1, 1); return; }
     sec = s;
+    sec_item[s] = 0;
+    for (i = 0; i < 8u; i++) item_pg[s][i] = 0;
     dirty_page = dirty_map = dirty_hdr = 1;
 }
-static void select_turn(int32_t e)              /* SELECT turned: the next / previous page of the section, across its items */
+static void page_step(int32_t e, int wrap)      /* the next / previous page of the section, across its items; wrap: the
+                                                 * last one's next is the first (the button), else it stops (SELECT) */
 {
     uint32_t n = SEC[sec].n, i = sec_item[sec] % n, pg = cur_pg(), was = i;
-    for (; e > 0; e--) if (++pg >= item_of(sec, i)->npg) { pg = 0; i = (i + 1u) % n; }
+    for (; e > 0; e--) {
+        if (pg + 1u < item_of(sec, i)->npg) pg++;
+        else if (i + 1u < n) { pg = 0; i++; }
+        else if (wrap) { pg = 0; i = 0; }
+    }
     for (; e < 0; e++) {
         if (pg) pg--;
-        else { i = (i + n - 1u) % n; pg = item_of(sec, i)->npg - 1u; }
+        else if (i) { i--; pg = item_of(sec, i)->npg - 1u; }
+        else if (wrap) { i = n - 1u; pg = item_of(sec, i)->npg - 1u; }
     }
     sec_item[sec] = i; item_pg[sec][i % 8u] = pg;
     dirty_page = dirty_map = 1;
     if (i != was) dirty_hdr = 1;                /* (the module's tab and its colour) */
 }
-static uint8_t arp_last = AR_UP;
-static void arp_toggle(void)                    /* the arp on / off (it keeps its mode) */
-{
-    if (live.v[P_ARP_MODE]) { arp_last = live.v[P_ARP_MODE]; pset(P_ARP_MODE, AR_OFF); say("ARP OFF"); }
-    else { pset(P_ARP_MODE, arp_last); say("ARP ON"); }
-    dirty_page = dirty_hdr = dirty_map = 1;
-}
 static void buttons(void)
 {
     uint32_t rel, b = fm1_input_edges(&rel);
     if (!b && !rel) return;
+    if (reset_armed && b) {                     /* (0.5) the memory's reset: OCT+ only confirms, any other cancels */
+        reset_armed = 0; dirty_hdr = 1;
+        if (b >> BTN_OCT_UP & 1u) { memory_reset(); return; }
+        say("RESET CANCELLED");
+        return;                                 /* (the press only cancels: no octave, no page) */
+    }
     if (save_armed && (b & ~(1u << BTN_SAVE))) { save_armed = 0; dirty_hdr = 1; say("SAVE CANCELLED"); }
     /* tap / hold: EDIT (held: OCT- / OCT+ undo / redo), SAVE (held: white keys = INIT, RANDOM, MUTATE) */
-    if (b >> BTN_EDIT & 1u) { edit_t = fm1_ms; edit_used = 0; }   /* (EDIT held keeps the keys as notes) */
-    if (rel >> BTN_EDIT & 1u && !edit_used && fm1_ms - edit_t < 600u) go_section(S_EDIT);
-    if (b >> BTN_SAVE & 1u) { layer_btn = BTN_SAVE; layer_t = fm1_ms; layer_used = 0; say("F3 INIT  G3 RANDOM|A3 MUTATE (A VARIATION)"); }
+    if (b >> BTN_EDIT & 1u) edit_used = 0;      /* (EDIT held keeps the keys as notes) */
+    if (rel >> BTN_EDIT & 1u && !edit_used) go_section(S_EDIT);   /* (0.5: however long it was held) */
+    if (b >> BTN_SAVE & 1u) { layer_btn = BTN_SAVE; layer_used = 0; say("F3 INIT  G3 RANDOM|A3 MUTATE  G5 RESET"); }
     if (rel >> BTN_SAVE & 1u && layer_btn == BTN_SAVE) {
-        int tap = !layer_used && fm1_ms - layer_t < 600u;
+        int tap = !layer_used;                  /* (0.5: however long it was held, if no key was used) */
         layer_btn = 0xFFu;
-        toast = 0;
+        if (!reset_armed) toast = 0;            /* (SAVE + G5: the reset's question stays) */
         if (tap && save_armed) {                /* SAVE twice: saved */
             uint32_t u;
             prog_put(save_to % NPROG, &live);
@@ -1054,17 +1091,14 @@ static void buttons(void)
             set_dirty = 1; set_t = fm1_ms; dirty_hdr = 1;
         }
     }
-    if (b & (1u << BTN_HOME)) go_section(S_PERF);
+    if (b & (1u << BTN_HOME)) go_section(S_HOME);
     if (b & (1u << BTN_ENV)) go_section(S_ENV);
     if (b & (1u << BTN_LFO)) go_section(S_LFO);
     if (b & (1u << BTN_FX)) go_section(S_FX);
     if (b & (1u << BTN_SEQ)) go_section(S_PATCH);
-    if (b & (1u << BTN_GLO)) go_section(S_GLO);
-    if (b & (1u << BTN_ARP)) {                  /* ARP: its page (on / off: SELECT pressed; ARP again too, a shortcut) */
-        if (sec == S_ARP) arp_toggle();
-        sec = S_ARP;
-        dirty_page = dirty_hdr = dirty_map = 1;
-    }
+    if (b & (1u << BTN_GLO)) go_section(S_VCF); /* (0.5, the user: GLO opens the VCF; its reset is SAVE + G5) */
+    if (b & (1u << BTN_ARP)) go_section(S_ARP);  /* ARP: its page (0.5, the user: pressed again it no longer turns the
+                                                 * arp on / off; its MODE knob does, OFF or a mode) */
     if (b & (1u << BTN_SEL)) go_section(S_UTL);  /* (0.3: SELECT pressed: UTL; turned: the pages) */
     if (b & (1u << BTN_PLAY)) {                 /* PLAY: HOLD (the notes stay until the next chord), the panel's track */
         ctl_hold ^= 1u << ctrk;
@@ -1138,7 +1172,7 @@ static void encoders(void)
             }
         }
     }
-    if ((e = fm1_enc_take(ENC_SELECT)) != 0) select_turn(e);   /* SELECT: every page of the section */
+    if ((e = fm1_enc_take(ENC_SELECT)) != 0) page_step(e, 0);  /* SELECT: every page of the section, stopping at the ends */
     for (k = 0; k < 4u; k++)
         if ((e = fm1_enc_take(ENC_KNOB1 + k)) != 0) {
             int32_t id = page_param(k);
@@ -1157,43 +1191,120 @@ static void encoders(void)
         }
 }
 
-/* ---- the LEDs: the section's button, HOLD, ARP; the LFO button blinks with the LFO, as the reference panel's LFO RATE LED does
- * (lit steady while its page is open); the sounding note on the keys */
+/* (0.5, the user) HOLD lights PLAY green. The FM-1's PLAY has a green LED besides its own red one: column 8, row PA5
+ * (FMini-1's LED_PLAY_GREEN); the SMK-37's SEQ PLAY's own is the green (and on the host the button's bit shows it) */
+#if defined(OBV_HOST) || BOARD_SMK37
+#define HOLD_ON_OWN_LED 1
+static void led_play_green(int on) { (void)on; }
+#else
+#define HOLD_ON_OWN_LED 0
+static void led_play_green(int on)
+{
+    if (on) fm1_led[8] |= 2u;
+    else fm1_led[8] &= (uint8_t)~2u;
+}
+#endif
+/* ---- the LEDs: the section's button, HOLD (PLAY green), ARP, REC (the effects on); the sounding note on the keys.
+ * (0.5, the user: the LFO button no longer blinks with the LFO, it confused; the LFO's LED is the screen's) */
 static void leds(void)
 {
-    static uint32_t was = 0xFFFFFFFFu, kwas = 0xFFFFFFFFu, lfo_t, lfo_led;
-    uint32_t on = 0, keys = 0, i;
+    static uint32_t was, kwas, first = 1, green;
+    uint32_t on = 0, keys = 0, i, hold = ctl_hold >> ctrk & 1u;
     int32_t n = ui_note[ctrk] == 255u ? -1 : (int32_t)ui_note[ctrk] - note_base();
     on |= 1u << SEC[sec].btn;
-    if (fm1_ms - lfo_t >= 12u) { lfo_t = fm1_ms; lfo_led = trk[ctrk].lfo.ph < 0x80000000u; }   /* (looked at ~80 times a
-                                                 * second: an audio-rate LFO flickers, the LED driver is not flooded) */
-    if (ui_lfo_inc[ctrk] > LFO_STEADY_LED) lfo_led = 1;   /* (0.3: over ~20 Hz lit steady: no false slow blink) */
-    if (sec != S_LFO && lfo_led) on |= 1u << BTN_LFO;
     if (!set.fx_off) on |= 1u << BTN_REC;       /* (0.3) REC lit: the effects on */
     if (set.oct) {                              /* (0.3) the octave: +-1 lit, +-2 blinking slow, +-3 fast */
         uint32_t a = (uint32_t)(set.oct < 0 ? -set.oct : set.oct);
         if (a == 1u || (a == 2u && fm1_ms / 400u % 2u == 0u) || (a >= 3u && fm1_ms / 120u % 2u == 0u))
             on |= 1u << (set.oct < 0 ? BTN_OCT_DOWN : BTN_OCT_UP);
     }
-    if (ctl_hold >> ctrk & 1u) on |= 1u << BTN_PLAY;
+    if (hold && HOLD_ON_OWN_LED) on |= 1u << BTN_PLAY;   /* (0.5, the user: HOLD green: on the FM-1 its green LED, below) */
     if (live.v[P_ARP_MODE]) on |= 1u << BTN_ARP;
     if (save_armed && (fm1_ms / 250u & 1u)) on |= 1u << BTN_SAVE;
     if (n >= 0 && n < 27) keys = 1u << n;
-    if (layer_btn == BTN_SAVE) keys = 1u << 0 | 1u << 2 | 1u << 4;   /* (0.3.1) SAVE held: F3 INIT, G3 RANDOM, A3 MUTATE lit */
+    if (layer_btn == BTN_SAVE)                  /* (0.3.1) SAVE held: F3 INIT, G3 RANDOM, A3 MUTATE lit; (0.5) G5 the reset */
+        keys = 1u << 0 | 1u << 2 | 1u << 4 | 1u << 26;
+    if (reset_armed) on = (on & ~(1u << BTN_OCT_UP)) | (fm1_ms / 200u & 1u) << BTN_OCT_UP;   /* (OCT+ blinking: yes?) */
     if ((fm1_in.buttons >> BTN_EDIT & 1u) && undo_ok)   /* (0.3.1) EDIT held: OCT- / OCT+ lit (undo / redo) */
         on |= 1u << BTN_OCT_DOWN | 1u << BTN_OCT_UP;
-    if (on != was) {
-        for (i = 0; i < 14u; i++) if ((on ^ was) >> i & 1u) fm1_led_key(i, (int)(on >> i & 1u));
+    /* (0.5) the first time every LED is set, lit or not: the ones lit from the start were taken as lit already (REC,
+     * the effects on, stayed dark after power-on) */
+    if (first || on != was) {
+        for (i = 0; i < 14u; i++) if (first || ((on ^ was) >> i & 1u)) fm1_led_key(i, (int)(on >> i & 1u));
         was = on;
     }
-    if (keys != kwas) {
-        for (i = 0; i < 27u; i++) if ((keys ^ kwas) >> i & 1u) fm1_led_key(KEY_LED(i), (int)(keys >> i & 1u));
+    if (first || keys != kwas) {
+        for (i = 0; i < 27u; i++) if (first || ((keys ^ kwas) >> i & 1u)) fm1_led_key(KEY_LED(i), (int)(keys >> i & 1u));
         kwas = keys;
     }
+    if (first || green != hold) { green = hold; led_play_green((int)green); }
+    first = 0;
 }
 
 /* ---- saves: the settings 2 s after the last change, the programs at once, both only in silence (an erase stops the
  * audio ~50 ms) */
+/* the globals as on a first start (0.3.1, the user: MIDI channel 1, tracks 1-4 on channels 1-4) */
+static void settings_defaults(void)
+{
+    uint32_t i;
+    memset(&set, 0, sizeof set);
+    set.magic = SET_MAGIC; set.version = SET_VERSION; set.tempo = 120; set.kvel = 100;
+    set.midi_ch = 1;
+    for (i = 0; i < NTRK; i++) { set.tprog[i] = TPROG_DEF[i & 3u]; set.lvl[i] = NTRK > 1u ? 80 : 100; }
+}
+/* the globals checked (a value out of range: its default) and handed to the engine, the LEDs */
+static void settings_fix(void)
+{
+    uint32_t i;
+    if (set.trk >= NTRK) set.trk = 0;
+    for (i = 0; i < NTRK; i++) {
+        if (set.tprog[i] >= NPROG) set.tprog[i] = 0;
+        if (set.lvl[i] > 127u) set.lvl[i] = 100;
+        if (set.pan[i] < -64 || set.pan[i] > 64) set.pan[i] = 0;
+        ctl_lvl[i] = set.lvl[i]; ctl_pan[i] = set.pan[i];
+    }
+    if (set.tempo < 40u || set.tempo > 240u) set.tempo = 120;
+    if (set.oct < -3 || set.oct > 3) set.oct = 0;
+    if (set.midi_ch > 16u) set.midi_ch = 1;
+    if (set.tune < -50 || set.tune > 50) set.tune = 0;
+    if (!set.kvel || set.kvel > 127u) set.kvel = 100;
+    if (set.lights > 11u) set.lights = 0;
+    set.fx_off = set.fx_off ? 1u : 0u;
+    if (set.clk_src > CLK_TRS) set.clk_src = CLK_INT;
+    ctl_clk_ext = set.clk_src != CLK_INT;
+    ctl_fx_off = set.fx_off;
+    lights_apply();                             /* (every key a little lit from the start) */
+    ctl_tempo = set.tempo;
+    ctl_tune8 = set.tune * 256 / 100;
+}
+/* (0.5) the whole memory as new: every saved program gone (the factory ones back), the globals as on a first start;
+ * the tracks reload, the flash is written when silent */
+static void memory_reset(void)   /* (0.5, the user: it gives the firmware back as on its first install) */
+{
+    uint32_t i;
+    for (i = 0; i < NPSECT; i++) { memset(&psect[i], 0, sizeof psect[i]); psect[i].tag = PS_TAG; }
+    settings_defaults();
+#ifndef OBV_HOST
+    /* written now (the erases stop the sound a moment), then a restart: the splash, every track on its first program,
+     * HOME's first page, no HOLD, octave 0, the effects on, as the first power-on */
+    say("MEMORY RESET|RESTARTING");
+    for (i = 0; i < NPSECT; i++) psect_save(i, &psect[i], sizeof psect[i]);
+    settings_save(&set, sizeof set);
+    fm1_reboot();
+#else
+    /* (the host cannot restart: the same, in place) */
+    for (i = 0; i < NPSECT; i++) psect_dirty |= 1u << i;
+    settings_fix();
+    ctl_clk_run = 0; ctl_ext_quarter = 0;
+    for (i = 0; i < NTRK; i++) { trk_load(i, set.tprog[i]); ctl_cc7[i] = 127; nrpn_msb[i] = nrpn_lsb[i] = 127; }
+    ctl_hold = 0; undo_ok = 0; save_armed = 0; layer_btn = 0xFFu;
+    sec = S_HOME;
+    memset(sec_item, 0, sizeof sec_item); memset(item_pg, 0, sizeof item_pg);
+    set_dirty = 1; set_t = fm1_ms - 2001u;
+    dirty_hdr = dirty_page = dirty_map = dirty_graph = 1;
+    say("MEMORY RESET");
+#endif
+}
 static void saves(void)
 {
     uint32_t i;
@@ -1219,46 +1330,27 @@ static void app_main(void)
     cc_map_init();
     for (i = 0; i < NPSECT; i++)
         if (psect_load(i, &psect[i], sizeof psect[i])
-            || (psect[i].tag != PS_TAG && psect[i].tag != PS_TAG_03 && psect[i].tag != PS_TAG_02 && psect[i].tag != PS_TAG_01)) {
+            || (psect[i].tag != PS_TAG && psect[i].tag != PS_TAG_05 && psect[i].tag != PS_TAG_04 && psect[i].tag != PS_TAG_03
+                && psect[i].tag != PS_TAG_02 && psect[i].tag != PS_TAG_01)) {
             memset(&psect[i], 0, sizeof psect[i]); psect[i].tag = PS_TAG;
-        } else if (psect[i].tag != PS_TAG) {    /* (0.1's .. 0.3.1's: converted here, written so with the sector's next save) */
+        } else if (psect[i].tag != PS_TAG) {    /* (0.1's .. 0.5's first: converted here, written so with the sector's next save) */
             uint32_t j;
             for (j = 0; j < PS_N; j++)
                 if (psect[i].used[j >> 5] >> (j & 31u) & 1u) {
                     if (psect[i].tag == PS_TAG_01) patch_from_01(&psect[i].p[j]);
                     else if (psect[i].tag == PS_TAG_02) patch_from_02(&psect[i].p[j]);
-                    else patch_from_03(&psect[i].p[j]);
+                    else if (psect[i].tag == PS_TAG_03) patch_from_03(&psect[i].p[j]);
+                    if (psect[i].tag != PS_TAG_05) patch_from_04(&psect[i].p[j]);   /* (every one before 0.5: ATTACK) */
+                    if (psect[i].tag == PS_TAG_04 || psect[i].tag == PS_TAG_05)   /* (S+H IN took the noise then) */
+                        patch_keep_sh_noise(psect[i].p[j].v);
                 }
             psect[i].tag = PS_TAG;
         }
     if ((settings_load(&set, sizeof set) && settings_load(&set, SET_SIZE_02)) || set.magic != SET_MAGIC
-        || set.version != SET_VERSION) {
-        memset(&set, 0, sizeof set);
-        set.magic = SET_MAGIC; set.version = SET_VERSION; set.tempo = 120; set.kvel = 100;
-        set.midi_ch = 1;                        /* (0.3.1, the user: channel 1 at first, tracks 1-4 on channels 1-4) */
-        for (i = 0; i < NTRK; i++) { set.tprog[i] = TPROG_DEF[i & 3u]; set.lvl[i] = NTRK > 1u ? 80 : 100; }
-    }
-    if (set.trk >= NTRK) set.trk = 0;
+        || set.version != SET_VERSION)
+        settings_defaults();
     for (i = 0; i < NTRK; i++) nrpn_msb[i] = nrpn_lsb[i] = 127;
-    for (i = 0; i < NTRK; i++) {
-        if (set.tprog[i] >= NPROG) set.tprog[i] = 0;
-        if (set.lvl[i] > 127u) set.lvl[i] = 100;
-        if (set.pan[i] < -64 || set.pan[i] > 64) set.pan[i] = 0;
-        ctl_lvl[i] = set.lvl[i]; ctl_pan[i] = set.pan[i];
-    }
-    if (set.tempo < 40u || set.tempo > 240u) set.tempo = 120;
-    if (set.oct < -3 || set.oct > 3) set.oct = 0;
-    if (set.midi_ch > 16u) set.midi_ch = 1;
-    if (set.tune < -50 || set.tune > 50) set.tune = 0;
-    if (!set.kvel || set.kvel > 127u) set.kvel = 100;
-    if (set.lights > 11u) set.lights = 0;
-    set.fx_off = set.fx_off ? 1u : 0u;
-    if (set.clk_src > CLK_TRS) set.clk_src = CLK_INT;
-    ctl_clk_ext = set.clk_src != CLK_INT;
-    ctl_fx_off = set.fx_off;
-    lights_apply();                             /* (every key a little lit from the start) */
-    ctl_tempo = set.tempo;
-    ctl_tune8 = set.tune * 256 / 100;
+    settings_fix();
     for (i = 0; i < NTRK; i++) trk_load(i, set.tprog[i]);
     set_dirty = 0;
     layer_btn = 0xFFu;
@@ -1272,6 +1364,7 @@ static void app_main(void)
         buttons();
         encoders();
         if (save_armed && fm1_ms - save_t > 8000u) { save_armed = 0; dirty_hdr = 1; say("SAVE CANCELLED"); }
+        if (reset_armed && fm1_ms - reset_t > 8000u) { reset_armed = 0; dirty_hdr = 1; say("RESET CANCELLED"); }
         if (diag_req) { diag_req = 0; diag_send(); }
         if (ctl_clk_run && fm1_ms - clk_last > 300u) { ctl_clk_run = 0; if (sec == S_LFO) dirty_page = 1; }   /* (no clock) */
         saves();
@@ -1284,7 +1377,7 @@ static void app_main(void)
         if (dirty_map || (toast && fm1_ms - toast_t >= 1800u)) { dirty_map = 0; draw_map(); }
         {                                       /* the graph: after a change, and 20 times a second while it moves */
             uint32_t g = cur_graph();
-            int playing = ui_note[ctrk] != 255u, moving = g == G_LFO || g == G_SH || g == G_TRACKS || g == G_VMOD || g == G_CLK
+            int playing = ui_note[ctrk] != 255u, moving = g == G_LFO || g == G_SH || g == G_TRACKS || g == G_VMOD
                 || (g_live(g) && g != G_SCOPE && (playing || graph_played));
             uint32_t gap = fm1_ms - knob_t < 150u ? 70u : dirty_graph ? 30u : 50u;   /* (a knob turning comes first) */
             if (g != G_SCOPE && (dirty_graph || moving) && fm1_ms - t_graph >= gap) {

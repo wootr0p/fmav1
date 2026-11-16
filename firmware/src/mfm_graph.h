@@ -6,7 +6,7 @@
 static int g_live(uint32_t g)                   /* drawn again while it plays (or always: the LFO, the S+H, the tracks) */
 {
     return g == G_SCOPE || g == G_VCF || g == G_EG || g == G_VCA || g == G_LFO || g == G_SH || g == G_VMOD || g == G_TRACKS
-        || g == G_DLY || g == G_REV || g == G_CLK;
+        || g == G_DLY || g == G_REV;
 }
 static int32_t g_y(int32_t v, int32_t top, int32_t h)   /* a value +-32768 -> y in Q8 within [top, top + h] */
 {
@@ -23,7 +23,7 @@ static int32_t vco_wave(uint32_t ph, uint32_t duty, int32_t w)
 }
 static int32_t lfo_wave(uint32_t ph, int32_t w)
 {
-    int32_t p = (int32_t)((ph + 0x40000000u) >> 15), tri = p < 65536 ? p - 32768 : 98303 - p, sq = ph < 0x80000000u ? 30000 : -30000;
+    int32_t tri = lfo_tri(ph), sq = ph < LFO_RISE ? 30000 : -30000;   /* (as mlfo_tick: skewed, 0.5) */
     return ((tri * (32768 - w)) >> 15) + ((sq * w) >> 15);
 }
 static uint32_t duty_of(const uint8_t *pv) { return (uint32_t)(DUTY_MIN16 + pv[P_PW] * DUTY_SPAN16 / 127) << 16; }
@@ -61,7 +61,7 @@ static void env_bounds(const uint8_t *pv, int32_t *bx)   /* the stages' x over 2
 }
 static int32_t env_at(const uint8_t *pv, const int32_t *bx, int32_t x)   /* the contour at x, Q15 */
 {
-    int32_t s = pv[P_SUSTAIN] * 258;
+    int32_t s = SUS_Q15[pv[P_SUSTAIN] & 127u];
     if (x < bx[1]) return env_shape(ENVG_ATT, x, bx[1]);
     if (x < bx[2]) return s + (((32767 - s) * env_shape(ENVG_DEC, x - bx[1], bx[2] - bx[1])) >> 15);
     if (x < bx[3]) return s;
@@ -161,7 +161,7 @@ static void g_filter(const uint8_t *pv, uint32_t ti, uint16_t c)
 {
     static int32_t yq[220];
     char s[64];                                 /* (0.3.2: room for "+ ONE+TWO  IN: FOLDER + NOISE") */
-    int32_t knob8 = CUT_LO8 + pv[P_CUTOFF] * 16 * (CUT_SPAN8 >> 3) / 254, cut8 = knob8, x, rq = res_row(pv[P_RES]);
+    int32_t knob8 = CUT_P8[pv[P_CUTOFF] & 127u] + fine8(pv[P_CUT_FINE]), cut8 = knob8, x, rq = res_row(pv[P_RES]);
     int playing = ui_note[ti % NTRK] != 255u;
     if (playing) cut8 = ui_cut8[ti % NTRK];
     g_begin();
@@ -192,7 +192,7 @@ static void g_filter(const uint8_t *pv, uint32_t ti, uint16_t c)
     if (pv[PJ(I_FOLD)]) scat(s, "  IN: FOLDER");
     if (pv[P_NOISE]) scat(s, " + NOISE");
     g_label(GX0 + 2, GY0, s, c);
-    s[0] = 0; fmt_hz(s, cut_hz(pv[P_CUTOFF])); scat(s, " Hz");
+    s[0] = 0; fmt_hz(s, cut_hz8(knob8)); scat(s, " Hz");   /* (0.5: the fine with it) */
     g_label_r(s, c);
     g_end();
 }
@@ -218,7 +218,7 @@ static void g_lfo(const uint8_t *pv, uint32_t ti, uint16_t c)
     g_label(GX0 + 2, GY0, s, c);
     s[0] = 0;
     if (pv[P_LFO_SYNC]) { scat(s, "SYNC "); scat(s, DIV_NAME[(pv[P_LFO_SYNC] - 1u) % NCLKDIV]); }
-    else fmt_lhz(s, LFO_HZ_X100[pv[P_LFO_RATE] & 127u]);
+    else fmt_lhz(s, lfo_hz_x100(pv));          /* (0.5: RATE FINE with it) */
     g_label_r(s, c);
     g_end();
 }
@@ -238,7 +238,7 @@ static void g_sh(const uint8_t *pv, uint32_t ti, uint16_t c)
         cv_rect(x, y, 13, 2, i == 15u ? C_TEXT : c);
     }
     s[0] = 0;
-    scat(s, pv[PJ(I_SHIN)] ? JSRC_NAME[pv[PJ(I_SHIN)] % NJSRC] : "NOISE");
+    scat(s, pv[PJ(I_SHIN)] ? JSRC_NAME[pv[PJ(I_SHIN)] % NJSRC] : "VCO");
     scat(s, " SAMPLED BY ");
     scat(s, pv[PJ(I_SHGATE)] ? JSRC_NAME[pv[PJ(I_SHGATE)] % NJSRC] : "LFO");
     g_label(GX0 + 2, GY0, s, c);
@@ -333,7 +333,7 @@ static const pbcell_t PB[PB_ROWS][3] = {
     {{0, I_1VOCT, "1V/OCT"}, {0, I_PWM, "PWM"}, {0, I_ONE, "ONE (-5)"}},
     {{0, I_LFORATE, "LFO RATE"}, {0, I_CUTOFF, "CUTOFF"}, {1, J_ONE, "ONE"}},
     {{0, I_GATE, "GATE"}, {0, I_VCACV, "VCA CV"}, {0, I_TWO, "TWO"}},
-    {{1, J_VCO, "VCO"}, {0, I_SHIN, "S+H (NOISE)"}, {1, J_ONETWO, "ONE+TWO"}},
+    {{1, J_VCO, "VCO"}, {0, I_SHIN, "S+H (VCO)"}, {1, J_ONETWO, "ONE+TWO"}},
     {{1, J_LFO, "LFO"}, {0, I_SHGATE, "S+H GATE"}, {0, I_ATTN, "ATTN (+5)"}},
     {{1, J_EG, "EG"}, {1, J_SH, "S+H"}, {1, J_ATTN, "ATTN"}},
 };
@@ -347,11 +347,13 @@ static int pb_where(uint32_t out, uint32_t id, int32_t *x, int32_t *y)   /* a ja
             if (PB[r][c].out == out && PB[r][c].id == id) { *x = PB_X((int32_t)c); *y = PB_Y((int32_t)r); return 1; }
     return 0;
 }
-static void pb_cable(int32_t ox, int32_t oy, int32_t ix, int32_t iy, int32_t sag, uint16_t c)
+static void pb_cable(int32_t ox, int32_t oy, int32_t ix, int32_t iy, int32_t bx, int32_t by, uint16_t c)
 {
     int32_t k, px = ox * 256, py = oy * 256, x0 = ox * 256, y0 = oy * 256, x1 = ix * 256, y1 = iy * 256;
-    for (k = 1; k <= 18; k++) {                 /* a hanging cable: the chord plus a sag that peaks in the middle */
-        int32_t uu = k * 256 / 18, nx = x0 + (x1 - x0) * uu / 256, ny = y0 + (y1 - y0) * uu / 256 + sag * 256 * 4 * uu * (256 - uu) / 65536;
+    for (k = 1; k <= 18; k++) {                 /* the chord plus a bow (bx, by: its offset at the middle, px) */
+        int32_t uu = k * 256 / 18, w = 4 * uu * (256 - uu);   /* (0 .. 65536 at the middle) */
+        int32_t nx = x0 + (x1 - x0) * uu / 256 + bx * 256 * (w >> 8) / 256;
+        int32_t ny = y0 + (y1 - y0) * uu / 256 + by * 256 * (w >> 8) / 256;
         cv_wu(px, py + 384, nx, ny + 384, blend565(C_BG, C_SH, 200));
         cv_wu2(px, py, nx, ny, c);
         px = nx; py = ny;
@@ -360,7 +362,7 @@ static void pb_cable(int32_t ox, int32_t oy, int32_t ix, int32_t iy, int32_t sag
 static void pb_plug(int32_t x, int32_t y, uint16_t c) { cv_disc_g(x, y, 4, blend565(c, C_INK, 70), blend565(c, C_SH, 100)); }
 static void ui_patchbay(const uint8_t *pv, const int16_t *swing, const char *sub, const pmap_t *pm)
 {
-    uint32_t r, c, i;
+    uint32_t r, c, i, ncab = 0, nvert = 0;
     cv_begin(240, 192, C_BG);
     ui_box(192, "PATCH", C_JACK);
     page_title("PATCHBAY", sub, pm, 0, C_JACK);
@@ -379,29 +381,39 @@ static void ui_patchbay(const uint8_t *pv, const int16_t *swing, const char *sub
     {                                           /* VCA OUT: the audio out, its cable off the panel (the headphones) */
         int32_t x, y;
         pb_where(1, J_VCA, &x, &y);
-        pb_cable(19, y + 6, x, y, 3, CABLE_C[J_VCA]);
+        pb_cable(19, y + 6, x, y, 0, 3, CABLE_C[J_VCA]);
         pb_plug(x, y, CABLE_C[J_VCA]);
     }
     for (i = 0; i < NJIN; i++) {                /* the cables, then their plugs */
         uint32_t s = pv[PJ(i)];
-        int32_t ox, oy, ix, iy, d, sag;
+        int32_t ox, oy, ix, iy, dx, dy, adx, ady, len, bow, bx, by;
         if (!s || !jack_ok(i, s) || !pb_where(0, i, &ix, &iy)) continue;
         if (s == J_DUMMY) {                     /* a plug on its own: its cable hangs loose, its other end free */
-            pb_cable(ix, iy, ix + 9, iy + 13, 2 + swing[i] / 3, CABLE_C[s]);
+            pb_cable(ix, iy, ix + 9, iy + 13, 0, 2 + swing[i] / 3, CABLE_C[s]);
             pb_plug(ix, iy, CABLE_C[s]);
             cv_round(ix + 7, iy + 12, 5, 5, blend565(CABLE_C[s], C_SH, 60));
             continue;
         }
         if (JS_EXT(s)) {                        /* from outside the panel (MIDI): in from above, no plug at that end */
             ox = ix - 14; oy = -10;
-            pb_cable(ox, oy, ix, iy, 4 + swing[i] / 2, CABLE_C[s]);
+            pb_cable(ox, oy, ix, iy, 0, 4 + swing[i] / 2, CABLE_C[s]);
             pb_plug(ix, iy, CABLE_C[s]);
             continue;
         }
         if (!pb_where(1, s, &ox, &oy)) continue;
-        d = (ox > ix ? ox - ix : ix - ox) + (oy > iy ? oy - iy : iy - oy);
-        sag = 6 + d / 4 + swing[i];
-        pb_cable(ox, oy, ix, iy, sag, CABLE_C[s]);
+        /* (0.5, the user: every cable told apart) it bows across its line: down for a level or slanting one (it
+         * hangs), sideways for one along a column (it ran straight over that column's jacks), the sides
+         * alternating; each cable drawn bows a little more than the last, so parallel ones never coincide */
+        dx = ix - ox; dy = iy - oy; adx = dx < 0 ? -dx : dx; ady = dy < 0 ? -dy : dy;
+        len = adx > ady ? adx + ady / 2 : ady + adx / 2;   /* (~ its length) */
+        bow = 6 + len / 4 + (int32_t)(ncab % 3u) * 4 + swing[i];
+        if (adx * 3 < ady) { bx = (nvert++ & 1u) ? -bow : bow; by = 0; }
+        else {
+            bx = -dy * bow / (len ? len : 1); by = dx * bow / (len ? len : 1);
+            if (by < 0) { bx = -bx; by = -by; }
+        }
+        ncab++;
+        pb_cable(ox, oy, ix, iy, bx, by, CABLE_C[s]);
         pb_plug(ox, oy, CABLE_C[s]);
         pb_plug(ix, iy, CABLE_C[s]);
     }
@@ -440,32 +452,6 @@ static void g_jacks(const uint8_t *pv, const int16_t *jp, int32_t focus)
     g_end();
 }
 
-/* ---- the clock (0.3): its note value's pulses over two bars, where the clock is now, the tempo and where it comes from */
-static void g_clk(const uint8_t *pv, uint16_t c)
-{
-    char s[32];
-    uint32_t tk = DIV_TICKS(pv[P_CLK_DIV] % NCLKDIV), wd = pv[P_CLK_WIDTH] + 1u, x, span = 192u;   /* two bars: 192 clocks */
-    int32_t top = GY0 + 16, h = 26, now;
-    g_begin();
-    for (x = 0; x < 216u; x++) {                /* the pulses, 216 px = two bars */
-        uint32_t ck = x * span / 216u, hi = (ck % tk) * 128u < tk * wd;
-        cv_rect(12 + (int32_t)x, hi ? top : top + h, 1, 2, c);
-        if (x && hi != ((((x - 1u) * span / 216u) % tk) * 128u < tk * wd)) cv_rect(12 + (int32_t)x, top, 1, h + 2, c);
-    }
-    for (x = 0; x <= 8u; x++) cv_rect(12 + (int32_t)(x * 27u), top + h + 4, 1, x % 4u ? 3 : 6, C_DIMT);   /* the beats */
-    now = 12 + (int32_t)((clk_pos >> 20) % span * 216u / span);
-    cv_rect(now, top - 3, 1, h + 8, C_TEXT);
-    s[0] = 0; scat(s, DIV_NAME[pv[P_CLK_DIV] % NCLKDIV]); scat(s, "  GATE "); fmt_u(s + slen(s), wd * 100u / 128u); scat(s, "%");
-    g_label(GX0 + 2, GY0, s, c);
-    s[0] = 0;
-    if (set.clk_src != CLK_INT) {               /* (0.4.1) the outside clock's: its tempo, --- until measured */
-        scat(s, CLK_NAME[set.clk_src % 3u]); scat(s, ctl_clk_run ? " " : " STOP ");
-        if (ctl_ext_quarter) fmt_u(s + slen(s), clk_bpm()); else scat(s, "---");
-    }
-    else { scat(s, "TEMPO "); fmt_u(s + slen(s), ctl_tempo); }
-    g_label_r(s, c);
-    g_end();
-}
 
 /* ---- the effects (0.2) */
 static void g_cho(const uint8_t *pv, uint16_t c)   /* the chorus: its two taps' delays sweeping, opposite */

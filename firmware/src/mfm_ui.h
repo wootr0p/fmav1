@@ -320,17 +320,17 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
         aa_label_c(cx, y0 + 64, &FA10, kv->value, acc, KCELL_W);
         return;
     }
-    ang = 225 - (kv->max ? 270 * kv->v / kv->max : 0);
+    ang = 240 - (kv->max ? 300 * kv->v / kv->max : 0);   /* (0.5: the reference panel turns 7 to 5 o clock, 300 degrees) */
     if (kv->style == KS_BIG)                    /* a big knob: a dense ring of fine ticks, as the panel's */
-        for (i = 0; i <= 30; i++) {
-            int32_t d = (225 - 9 * i) * 16;
+        for (i = 0; i <= 30; i++) {             /* (every 10 degrees; the clock hours long) */
+            int32_t d = (240 - 10 * i) * 16;
             knob_xy(cx, cy, 19, d, &px, &py);
             knob_xy(cx, cy, 22, d, &qx, &qy);
-            cv_wu(px, py, qx, qy, i % 5 ? RGB(120, 120, 120) : C_INK);
+            cv_wu(px, py, qx, qy, i % 3 ? RGB(120, 120, 120) : C_INK);
         }
     else
-        for (i = 0; i <= 8; i++) {              /* a small one: nine ticks */
-            int32_t d = (225 - (270 * i) / 8) * 16;
+        for (i = 0; i <= 10; i++) {             /* a small one: eleven ticks, the clock hours 7 .. 5 */
+            int32_t d = (240 - 30 * i) * 16;
             knob_xy(cx, cy, 17, d, &px, &py);
             knob_xy(cx, cy, 21, d, &qx, &qy);
             cv_wu(px, py, qx, qy, C_INK);
@@ -339,7 +339,7 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
         if (ang < 90) cv_arc(cx, cy, 24, 90, ang, acc, 1); else cv_arc(cx, cy, 24, ang, 90, acc, 1);
         cv_rect(cx, cy - 26, 1, 3, C_INK);
     } else
-        cv_arc(cx, cy, 24, 225, ang, acc, 1);
+        cv_arc(cx, cy, 24, 240, ang, acc, 1);
     cv_disc_g(cx + 1, cy + 2, 14, C_SH, C_SH);  /* the knob: black, a soft top light, a white line */
     cv_disc_g(cx, cy, 14, RGB(70, 70, 74), RGB(14, 14, 15));
     cv_disc_g(cx, cy, 12, RGB(34, 34, 36), RGB(6, 6, 7));
@@ -354,7 +354,7 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
 
 /* the graphs a page can show (mfm_graph.h draws them) */
 enum { G_SCOPE, G_VCO, G_VMOD, G_VCF, G_FMOD, G_EG, G_VCA, G_LFO, G_SH, G_FOLD, G_UMIX, G_ATTN, G_PATCH, G_KB, G_ARP, G_CHO,
-       G_DLY, G_REV, G_TRACKS, G_CLK, NG };
+       G_DLY, G_REV, G_TRACKS, NG };
 /* the modules (the tab of a page's box; TAB_NONE: the section's own) */
 enum { TAB_NONE = -1, TAB_VCO, TAB_VCF, TAB_EG, TAB_VCA, TAB_LFO, TAB_UTL, TAB_JACK, TAB_FX, NTAB };
 static const uint16_t TRKC[4] = {RGB(255, 84, 70), RGB(255, 204, 64), RGB(110, 222, 120), RGB(96, 172, 255)};
@@ -606,6 +606,7 @@ static void ui_splash(void)
     cv_begin(240, 60, C_BG);
     aa_text_c(120, 6, &FA16, "FM-1", C_ACC);
     aa_text_c(120, 30, &FA8, NTRK > 1u ? "SEMI-MODULAR  -  4 TRACKS" : "SEMI-MODULAR  -  1 TRACK", C_INK2);
+    aa_text_c(120, 45, &FA8, "VERSION " APP_VER, C_ACC);   /* (0.5, the user: the version on the boot screen) */
     cv_blit(0, 160);
     ui_wait_ms(700);
 }
