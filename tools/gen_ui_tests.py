@@ -83,4 +83,24 @@ for name, steps in (("a", COMMON), ("b", WANDER + COMMON)):
     Path(f"tests/mfm_det_{name}.txt").write_text(
         f"# the navigation's determinism, history {name.upper()} (0.5: tools/gen_ui_tests.py; shots {DET_SHOTS})\n" + HDR
         + "\n".join(f"{a} {b}" for a, b in steps) + "\n")
+# ---- (0.5.2, the user) REC held: every parameter on the screen shows its MIDI CC; let go: the values again, the
+# effects as they were; a short tap still turns them off / on. Two runs, B with REC and A without: the same screens
+# where REC must change nothing (CC_SAME), different ones where it shows (CC_DIFF); then B's CCs on the patchbay,
+# the VCF and the mixer (NO CC), to look at
+CC_SAME, CC_DIFF = [4200, 5300, 7800], [4900, 5700]
+CC_SHOTS = [(s, "shot") for s in sorted(CC_SAME + CC_DIFF)]
+CC_A = [(2100, "btn 2")] + CC_SHOTS + [(8000, "end")]                                    # FX: DELAY 1
+CC_B = sorted([(2100, "btn 2"), (4300, "btndown 13"), (5000, "btnup 13"),                # REC held 0.7 s
+               (5400, "btn 13"), (5800, "btn 13")] + CC_SHOTS                              # tapped: off, on
+              + [(8000, "btn 11"), (8100, "btndown 13"), (8700, "shot"), (8800, "btnup 13"),   # the patchbay
+                 (8900, "btn 7"), (9000, "btndown 13"), (9600, "shot"), (9700, "btnup 13"),    # GLO: the VCF
+                 (9800, "btn 8"), (9850, "midi 0xB1 7 40"), (9880, "shot"),                     # CC 7: LEVEL 2
+                 (9900, "btndown 13"), (10500, "shot"), (10600, "btnup 13"),                     # the mixer
+                 (10700, "btn 8"), (10750, "midi 0xB2 10 0"), (10800, "shot"),                   # CC 10: PAN 3
+                 (10850, "btndown 13"), (11400, "shot"), (11500, "btnup 13"),                    # the pans
+                 (11700, "end")])
+for name, steps in (("a", CC_A), ("b", CC_B)):
+    Path(f"tests/mfm_cc_{name}.txt").write_text(
+        f"# REC held: the MIDI CCs, run {name.upper()} (0.5.2: tools/gen_ui_tests.py; the same {CC_SAME}, different {CC_DIFF})\n"
+        + HDR + "\n".join(f"{a} {b}" for a, b in steps) + "\n")
 print("ok")

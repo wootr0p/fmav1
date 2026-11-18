@@ -34,6 +34,13 @@ det() {   # (0.5) two histories, then the same keys: the same screens, byte for 
     for s in 7000 7300 8000 8700 9000 9300; do cmp -s "$OUT/det_a-$s.png" "$OUT/det_b-$s.png" || { echo "page differs at $s ms"; return 1; }; done
 }
 run "the navigation is deterministic: the same keys, the same page, whatever came before" det
+ccv() {   # (0.5.2) REC held: the CCs; let go: as before, the effects untouched; tapped twice: off, then as before
+    sh tests/run_host.sh tests/mfm_cc_a.txt cc_a >/dev/null && sh tests/run_host.sh tests/mfm_cc_b.txt cc_b >/dev/null || return 1
+    for s in 4200 5300 7800; do cmp -s "$OUT/cc_a-$s.png" "$OUT/cc_b-$s.png" || { echo "REC changed the screen at $s ms"; return 1; }; done
+    for s in 4900 5700; do cmp -s "$OUT/cc_a-$s.png" "$OUT/cc_b-$s.png" && { echo "REC showed nothing at $s ms"; return 1; }; done
+    return 0
+}
+run "REC held: the MIDI CCs on the screen, the effects untouched; a tap: the effects off / on (build/host/cc_b-*.png)" ccv
 run "four tracks: channels N .. N+3, ALGORITHM, the mixer (build/host/tracks-*.png)" sh tests/run_host.sh tests/mfm_tracks.txt tracks
 run "the worst case on four tracks: everything at audio rate on each, chorus, delay and reverb" sh tests/run_host.sh tests/mfm_cpu.txt cpu4
 run "the screens for the manual: a lead's pages, the patchbay (build/host/screens-*.png)" sh tests/run_host.sh tests/mfm_screens.txt screens

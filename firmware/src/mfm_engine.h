@@ -71,7 +71,6 @@ static track_t trk[NTRK];
 static volatile int32_t ctl_bend[NTRK];         /* -8192..8191 */
 static volatile uint8_t ctl_wheel[NTRK], ctl_after[NTRK];   /* 0..127 */
 static volatile uint32_t ctl_sustain, ctl_hold; /* bit t: track t's pedal / HOLD */
-static volatile uint32_t ctl_cc7[NTRK];         /* CC 7 (127 at the start: engine_init) */
 static volatile int32_t ctl_tune8;              /* global tune, Q8 semitones */
 static volatile uint32_t ctl_tempo = 120, ctl_ext_quarter;   /* MIDI clock: frames per quarter, 0 = none */
 static volatile uint32_t ctl_arp_restart, ctl_panic;
@@ -591,7 +590,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
 /* ---- the audio half: events, arps and voices per control block; each track through its level and pan into the
  * mix; the output stage */
 static int32_t mbus[2u * HALF_FRAMES], dsend[2u * HALF_FRAMES], rsend[HALF_FRAMES], csend[HALF_FRAMES];
-static int32_t lvl_g[NTRK];                     /* each track's level x CC 7 as it moves, Q12 */
+static int32_t lvl_g[NTRK];                     /* each track's level as it moves, Q12 (0.5.2: CC 7 sets it) */
 static volatile uint32_t ui_trk_peak[NTRK];
 /* the audio interrupt starts with the platform, before app_main has set anything up (on the chip): until engine_init
  * has run, the halves stay silent (a patch read through a null pointer at boot crashed here) */
@@ -635,9 +634,8 @@ static void engine_audio(int32_t *out, uint32_t n)
         rm[ti] = on && v[P_RV_ON] ? v[P_RV_SEND] * 258 : 0;
         cm[ti] = on && v[P_CH_ON] ? v[P_CH_MIX] * 258 : 0;
     }
-    for (ti = 0; ti < NTRK; ti++) {             /* the mixer's level x CC 7, gliding over the half (no zipper) */
-        int32_t cc = (int32_t)(ctl_cc7[ti] * ctl_cc7[ti] * 4096u / 16129u);
-        tg[ti] = ((int32_t)(ctl_lvl[ti] * ctl_lvl[ti] * 4096u / 10000u) * cc) >> 12;
+    for (ti = 0; ti < NTRK; ti++) {             /* the mixer's level, gliding over the half (no zipper) */
+        tg[ti] = (int32_t)(ctl_lvl[ti] * ctl_lvl[ti] * 4096u / 10000u);
         dg[ti] = (tg[ti] - lvl_g[ti]) * 16 / (int32_t)n;
     }
     for (b = 0; b < n; b += CTL) {
@@ -745,7 +743,7 @@ static void engine_init(void)
         t->kb16 = t->target16 = 60 << 16;
         t->lc_key = -1;
         t->nrnd = 0x2545F491u * (ti + 1u);      /* (never 0: xorshift stays at 0) */
-        ctl_cc7[ti] = 127; ui_note[ti] = 255;
+        ui_note[ti] = 255;
     }
     fx_init();
     RING_PUBLISH();

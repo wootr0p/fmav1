@@ -38,7 +38,12 @@ folds at 5 / 15 / 25 V, rounded peaks, 2x oversampled).
   (ALGORITHM then the CUTOFF; levels at 100: the programs are levelled so).
 - The effects: all three are SENDS shared by the tracks (`mfm_fx.h`), each sound sends with its own SEND and ON, the
   character is the first track's that has it on. Fixed CCs 93 / 92 / 91. **REC** (0.3) switches every effect off / on
-  (`set.fx_off` -> `ctl_fx_off`: the sounds' ONs untouched; lit = on).
+  (`set.fx_off` -> `ctl_fx_off`: the sounds' ONs untouched; lit = on). 0.5.2 (the user): a tap (let go within
+  REC_HOLD_MS, 500) toggles them on the release; held longer, `cc_view`: knob_view and the patchbay's inputs show
+  each parameter's CC in a badge (`cc_of`, cc_map's inverse; V_LVL CC 7, V_PAN CC 10; `NO CC` for the V_ globals), the
+  effects untouched. CC 7 = the mixer's LEVEL (cc_level -> set.lvl / ctl_lvl; the old ctl_cc7 gain is gone), CC 10
+  its PAN (cc_pan: 0..63 -> -64..-1, 64..127 -> 0..+64).
+  (Asked the user: short tap / hold rather than two buttons.) Tests: mfm_cc_a / _b (run_tests.sh compares them).
 - The user's corrections, keep them: fast knob turns count every click (the HAL decoder takes every frame's state, after
   FMini-1 #126; `tests/enc_test.c`); a jack never offers its own module's outputs, VCA OUT (the audio out) or the mult
   (gone in 0.3) (`JIN_DENY` / `jack_ok`; `patch_fix_jacks` converts older programs: a cable from a mult comes from the
@@ -158,6 +163,12 @@ must be in time order and at most ~60 MIDI messages a millisecond; nothing befor
   the sync's tempo): `ctl_clk_ext` (USB / TRS chosen) makes arp_tick step only on the clock's grid (no clock running:
   the first note, then it waits); TEMPO locked (`knob_view_t.locked`: grey; turned: a toast), pget/param_value show the
   measured tempo ("TRS 125", "TRS ---"); a first measure after 24 clocks, then every 96 as before.
+- 0.5.2 (2026-11-18): ATTACK 153 ms at 10 o'clock (KNOB; was noon, the user by ear on the reference); ATT_FROM_051
+  for the 0.5 / 0.5.1 saves (MFM5 / MFM6 -> MFM7; MFM6 keeps its GATE cables) and the factory programs' attacks;
+  DECAY 1.2 s at noon and RELEASE 458 ms at 9 (the user), DEC_FROM_051 / REL_FROM_051 the same way (every program,
+  CLASSIC BASS too: the user, "dimentica la foto").
+  fmhub.json: a generic description, no calibration claim (the user: the calibration on the real unit is still
+  going on).
 - 0.5.1 (2026-11-16, the user): KEYBOARD on SELECT pressed; PRESS called AFTERTC; a GATE patch source (the note
   held, keys or MIDI) in the CLOCK output's old slot; the external sources' cables khaki and bowed apart; the test
   suite with progress and parallel sanitizers last (~2.5 min).

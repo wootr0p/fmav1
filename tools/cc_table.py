@@ -52,9 +52,11 @@ def main():
     print("# FMav-1: CC e NRPN\n")
     print("Ogni parametro del suono ha una CC diretta e un numero NRPN (CC 99 = 0, CC 98 = numero, CC 6 = valore "
           "0..127, scalato sul suo intervallo). CC fisse: 74 CUTOFF, 71 RESONANCE, 73 ATTACK, 72 RELEASE, 75 DECAY, "
-          "5 GLIDE, 93 CHORUS SEND, 92 DELAY SEND, 91 REVERB SEND, 1 mod wheel, 7 volume della traccia, 64 sustain, "
+          "5 GLIDE, 93 CHORUS SEND, 92 DELAY SEND, 91 REVERB SEND, 1 mod wheel, 7 LEVEL e 10 PAN della traccia nel mixer, 64 sustain, "
           "120 / 123 tutto spento. Le altre dalla CC 20 in su. Ogni traccia sul suo canale (N, N+1, N+2, N+3). "
           "Con * le estensioni che il pannello di riferimento non ha.\n")
+    print("Sull'FM-1, **tenendo premuto REC** (mezzo secondo) ogni manopola sullo schermo mostra la sua CC in un riquadro "
+          "pieno al posto del valore, e il PATCHBAY quella di ogni presa.\n")
     print("| CC | NRPN | Parametro |")
     print("| --- | --- | --- |")
     for i, cc, _ in rows:

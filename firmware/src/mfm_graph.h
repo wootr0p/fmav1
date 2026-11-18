@@ -362,7 +362,7 @@ static void pb_cable(int32_t ox, int32_t oy, int32_t ix, int32_t iy, int32_t bx,
     }
 }
 static void pb_plug(int32_t x, int32_t y, uint16_t c) { cv_disc_g(x, y, 4, blend565(c, C_INK, 70), blend565(c, C_SH, 100)); }
-static void ui_patchbay(const uint8_t *pv, const int16_t *swing, const char *sub, const pmap_t *pm)
+static void ui_patchbay(const uint8_t *pv, const int16_t *swing, const char *sub, const pmap_t *pm, const uint8_t *cc)
 {
     uint32_t r, c, i, ncab = 0, nvert = 0, next[3] = {0, 0, 0};
     cv_begin(240, 192, C_BG);
@@ -376,6 +376,15 @@ static void ui_patchbay(const uint8_t *pv, const int16_t *swing, const char *sub
             const pbcell_t *e = &PB[r][c];
             int32_t x = PB_X((int32_t)c), y = PB_Y((int32_t)r), w = aa_wt(&FA8, e->lbl, -1) + 4;
             if (e->out) { cv_round(x - w / 2, y - 15, w, 9, C_INK); aa_textt(x - w / 2 + 2, y - 15, &FA8, e->lbl, C_SH, -1); }
+            else if (cc) {                      /* (0.5.2) REC held: each input's MIDI CC instead of its name, in a
+                                                 * badge (the patch's yellow: the outputs' are white) */
+                char s[8] = "CC ";
+                int32_t bw;
+                fmt_u(s + 3, cc[PJ(e->id)]);
+                bw = aa_w(&FA8, s) + 4;
+                cv_round(x - bw / 2, y - 15, bw, 9, C_JACK);
+                aa_textt(x - bw / 2 + 2, y - 15, &FA8, s, C_SH, -1);
+            }
             else aa_label_c(x, y - 15, &FA8, e->lbl, pv[PJ(e->id)] ? C_INK : C_INK2, 60);
             cv_jack(x, y, 5, 0, 0);
         }

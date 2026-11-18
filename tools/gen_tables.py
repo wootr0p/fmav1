@@ -65,10 +65,14 @@ KNOB = {
                                                            # unit, RATE at its minimum: a cycle every ~6.06 s; at noon
                                                            # the user's recording, the LFO's PWM gating a pulse: a burst
                                                            # every ~213 ms, 4.7 Hz (it was ~9.5 Hz, the ends' mean))
-    "ATTACK":      (0.8,        {9: 44.0, 12: 153.0, 3: 1150.0}, 2500.0, "exp"),   # ms (the manual: 0.8 ms .. 5.5 s; the user's ear: 2.5 s)
-    "DECAY":       (3.0,        {9: 437.0, 12: 668.0}, 16000.0, "exp"),   # ms, the reference's seconds (TAUS below; the manual: 3 ms
+    "ATTACK":      (0.8,        {9: 44.0, 10: 153.0, 3: 1150.0}, 2500.0, "exp"),   # ms (the manual: 0.8 ms .. 5.5 s; the user's ear: 2.5 s;
+                                                           # 0.5.2, the user by ear on the reference: 153 ms at 10
+                                                           # o'clock, it was at noon)
+    "DECAY":       (3.0,        {9: 437.0, 12: 1200.0}, 16000.0, "exp"),   # (0.5.2, the user: 1.2 s at noon, was 668 ms)
+      # ms, the reference's seconds (TAUS below; the manual: 3 ms
                                                            # .. 18 s; the user, by the real unit: 16 s)
-    "RELEASE":     (3.0,        {9: 330.0, 12: 627.0}, 18000.0, "exp"),   # ms to 5 % of the way (the manual: 3 ms .. 18 s;
+    "RELEASE":     (3.0,        {9: 458.0, 12: 627.0}, 18000.0, "exp"),   # (0.5.2, the user: 458 ms at 9)
+      # ms to 5 % of the way (the manual: 3 ms .. 18 s;
                                                            # 9 o'clock: the recording below, was 39 ms; near DECAY's)
     "SUSTAIN":     (0.0,        {9: 1.34, 12: 4.8}, 10.0, "lin"),   # the dial, 10 = 8 V (the manual: 0 .. 8 V); linear
                                                            # (the user) between: 4.8 at noon (the user), 1.34 at 9
@@ -145,6 +149,38 @@ def knob(name, v, n=127):
 assert KNOB["PULSE_WIDTH"][1] is None and KNOB["KB_SCALE"][1] is None, "PULSE WIDTH and KB SCALE: linear, no noon"
 
 
+ATTACK_051 = (0.8, {9: 44.0, 12: 153.0, 3: 1150.0}, 2500.0, "exp")   # 0.5 / 0.5.1's ATTACK (ATT_FROM_051)
+DECAY_051 = (3.0, {9: 437.0, 12: 668.0}, 16000.0, "exp")   # 0.5 / 0.5.1's DECAY (DEC_FROM_051)
+RELEASE_051 = (3.0, {9: 330.0, 12: 627.0}, 18000.0, "exp")   # 0.5 / 0.5.1's RELEASE (REL_FROM_051)
+
+
+def rel_from_051(v):
+    """a RELEASE set by 0.5 / 0.5.1: the knob's value nearest to its time now"""
+    saved = KNOB["RELEASE"]
+    KNOB["RELEASE"] = RELEASE_051
+    t = knob("RELEASE", v)
+    KNOB["RELEASE"] = saved
+    return min(range(128), key=lambda k: abs(math.log(knob("RELEASE", k) / t)))
+
+
+def dec_from_051(v):
+    """a DECAY set by 0.5 / 0.5.1: the knob's value nearest to its time now"""
+    saved = KNOB["DECAY"]
+    KNOB["DECAY"] = DECAY_051
+    t = knob("DECAY", v)
+    KNOB["DECAY"] = saved
+    return min(range(128), key=lambda k: abs(math.log(knob("DECAY", k) / t)))
+
+
+def att_from_051(v):
+    """an ATTACK set by 0.5 / 0.5.1: the knob's value nearest to its time now"""
+    saved = KNOB["ATTACK"]
+    KNOB["ATTACK"] = ATTACK_051
+    t = knob("ATTACK", v)
+    KNOB["ATTACK"] = saved
+    return min(range(128), key=lambda k: abs(math.log(knob("ATTACK", k) / t)))
+
+
 def att_from_04(v):
     """an ATTACK saved before 0.5 (0.8 ms .. 5.5 s): the knob's value nearest to its time now"""
     t = expo(0.8, 5500.0, v)
@@ -217,6 +253,12 @@ def main(path):
     L += arr("ATT_SHAPE", "uint16_t", [int(round(32767 * att_shape(i / 256))) for i in range(257)], 12)
     # an ATTACK saved before 0.5 (0.8 ms .. 5.5 s) -> the same time on the knob now (its nearest)
     L += arr("ATT_FROM_04", "uint8_t", [att_from_04(v) for v in range(128)], 16)
+    # (0.5.2) an ATTACK set by 0.5 / 0.5.1 (153 ms at noon) -> the same time on the knob now (153 ms at 10)
+    L += arr("ATT_FROM_051", "uint8_t", [att_from_051(v) for v in range(128)], 16)
+    # (0.5.2) a DECAY set by 0.5 / 0.5.1 (668 ms at noon) -> the same time on the knob now (1.2 s at noon)
+    L += arr("DEC_FROM_051", "uint8_t", [dec_from_051(v) for v in range(128)], 16)
+    # (0.5.2) a RELEASE set by 0.5 / 0.5.1 (330 ms at 9) -> the same time on the knob now (458 ms at 9)
+    L += arr("REL_FROM_051", "uint8_t", [rel_from_051(v) for v in range(128)], 16)
     # SUSTAIN: the level over the knob, Q15 of the EG's top (8 V)
     L += arr("SUS_Q15", "uint16_t", [int(round(32767 * knob("SUSTAIN", v) / 10.0)) for v in range(128)])
     # (0.5) VCF MOD AMT: 64 = 0, +-32767 at the ends (EG at its top: +-8 octaves), |x| ^ VCF_AMT_LAW between

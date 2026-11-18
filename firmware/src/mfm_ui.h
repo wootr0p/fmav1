@@ -295,10 +295,22 @@ typedef struct {
     char value[16];
     int32_t v, max, bip, present;
     uint8_t style, icl, icr;                    /* the signs at the scale's ends */
+    uint8_t badge;                              /* (0.5.2) the value is a MIDI CC (REC held): drawn as a badge */
     uint8_t locked;                             /* (0.4.1) not turnable now: grey (TEMPO under an outside clock) */
     uint16_t cable;                             /* a jack: its cable's colour (0: no cable) */
 } knob_view_t;
 #define KCELL_W 54
+/* a knob's value under it; (0.5.2, the user) REC held, its MIDI CC in a badge: dark on the page's colour */
+static void knob_value(int32_t cx, int32_t y, const knob_view_t *kv, uint16_t c, uint16_t acc)
+{
+    if (kv->badge) {
+        int32_t w = aa_w(&FA10, kv->value) + 8;
+        cv_round(cx - w / 2, y + 1, w, 12, acc);
+        aa_text(cx - w / 2 + 4, y + 1, &FA10, kv->value, C_SH);
+        return;
+    }
+    aa_label_c(cx, y, &FA10, kv->value, c, KCELL_W);
+}
 static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t acc, uint32_t glow)
 {
     int32_t cx = x0 + KCELL_W / 2, cy = y0 + 40, ang, px, py, qx, qy, i;
@@ -312,12 +324,12 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
             cv_wu2((cx - 2) * 256, (cy - 5) * 256, (cx - 9) * 256, (y0 + 19) * 256, kv->cable);
         }
         cv_jack(cx, cy + 2, 9, kv->cable, 0);
-        aa_label_c(cx, y0 + 64, &FA10, kv->value, kv->cable ? acc : C_INK2, KCELL_W);
+        knob_value(cx, y0 + 64, kv, kv->cable ? acc : C_INK2, acc);
         return;
     }
     if (kv->style == KS_TOGGLE) {
         cv_toggle(cx, cy + 2, kv->v != 0, kv->top, kv->bot, acc);
-        aa_label_c(cx, y0 + 64, &FA10, kv->value, acc, KCELL_W);
+        knob_value(cx, y0 + 64, kv, acc, acc);
         return;
     }
     ang = 240 - (kv->max ? 300 * kv->v / kv->max : 0);   /* (0.5: the reference panel turns 7 to 5 o clock, 300 degrees) */
@@ -349,7 +361,7 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
     cv_wu2(px, py, qx, qy, C_INK);
     if (kv->icl) cv_icon(cx - 25, cy + 16, kv->icl, C_INK2);
     if (kv->icr) cv_icon(cx + 17, cy + 16, kv->icr, C_INK2);
-    aa_label_c(cx, y0 + 64, &FA10, kv->value, acc, KCELL_W);
+    knob_value(cx, y0 + 64, kv, acc, acc);
 }
 
 /* the graphs a page can show (mfm_graph.h draws them) */

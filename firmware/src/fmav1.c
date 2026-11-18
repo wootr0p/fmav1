@@ -79,7 +79,8 @@ static void lights_apply(void)
 }
 
 #define PS_N 40u                                /* programs a sector */
-#define PS_TAG 0x364D464Du                      /* "MFM6": 0.5's (S+H IN's normal the VCO again) */
+#define PS_TAG 0x374D464Du                      /* "MFM7": 0.5.2's (ATTACK 153 ms at 10 o'clock: ATT_FROM_051) */
+#define PS_TAG_06 0x364D464Du                   /* "MFM6": 0.5 / 0.5.1's (S+H IN's normal the VCO again) */
 #define PS_TAG_05 0x354D464Du                   /* "MFM5": 0.5's first builds (S+H IN's normal the noise) */
 #define PS_TAG_04 0x344D464Du                   /* "MFM4": 0.4 .. 0.4.1's, the layout of now (the name at PNAME_AT, spare
                                                  * slots 0xFF): only ATTACK converted (ATT_FROM_04) */
@@ -502,6 +503,7 @@ static void param_value(char *s, int32_t id, int32_t v)   /* <= 8 characters */
 
 /* ---- MIDI CC: the fixed ones, the rest from CC 20 up in the table's order (and every parameter by NRPN 0 / index) */
 static uint8_t cc_map[128];                     /* CC -> parameter + 1 */
+static uint8_t cc_of[NPARAM];                   /* (0.5.2) parameter -> its CC (0: none) */
 static int cc_reserved(uint32_t cc) { return cc == 64u || (cc >= 71u && cc <= 75u) || (cc >= 91u && cc <= 93u) || cc == 98u || cc == 99u; }
 static void cc_map_init(void)
 {
@@ -513,6 +515,7 @@ static void cc_map_init(void)
         if (cc >= 120u) break;
         cc_map[cc++] = (uint8_t)(p + 1u);
     }
+    for (cc = 0; cc < 128u; cc++) if (cc_map[cc]) cc_of[cc_map[cc] - 1u] = (uint8_t)cc;
 }
 static int32_t cc_scale(int32_t id, uint32_t v) { uint32_t m = pmax(id); return m == 127u ? (int32_t)v : (int32_t)((v * m + 63u) / 127u); }
 
@@ -597,6 +600,10 @@ static uint32_t layer_btn, layer_used;          /* a held button whose keys are 
 static uint32_t reset_armed, reset_t;           /* (0.5) GLO + G5: the memory's reset waits for OCT+ */
 static void memory_reset(void);
 static uint32_t edit_used;                      /* EDIT: used as a modifier (undo / redo) since pressed */
+/* (0.5.2, the user) REC: a tap (let go within REC_HOLD_MS) turns every effect off / on; held longer, every
+ * parameter on the screen shows its MIDI CC instead of its value (cc_view), the effects untouched */
+#define REC_HOLD_MS 500u
+static uint32_t rec_down, rec_t, cc_view;
 static uint32_t keys_prev;
 static uint8_t key_note[27], key_fn[27], key_trk[27];
 
@@ -691,6 +698,23 @@ static void cc_param(uint32_t t, int32_t id, uint32_t v)
     if (t % NTRK != ctrk) return;
     if ((k = knob_of(id)) >= 0) dirty_knob |= 1u << k;
 }
+static void cc_level(uint32_t t, uint32_t v)   /* (0.5.2, the user) CC 7 on a track's channel: its mixer LEVEL */
+{
+    int32_t k;
+    t %= NTRK;
+    if (set.lvl[t] == v) return;                /* (the same value again: no settings write) */
+    set.lvl[t] = (uint8_t)v; ctl_lvl[t] = (uint8_t)v; set_dirty = 1; set_t = fm1_ms;
+    if ((k = knob_of(V_LVL1 + (int32_t)t)) >= 0) dirty_knob |= 1u << k;
+}
+static void cc_pan(uint32_t t, uint32_t v)     /* (0.5.2, the user) CC 10 on a track's channel: its mixer PAN (0 all
+                                                 * left, 64 the centre, 127 all right) */
+{
+    int32_t k, p = v < 64u ? (int32_t)v - 64 : ((int32_t)v - 64) * 64 / 63;
+    t %= NTRK;
+    if (set.pan[t] == p) return;                /* (the same value again: no settings write) */
+    set.pan[t] = (int8_t)p; ctl_pan[t] = (int8_t)p; set_dirty = 1; set_t = fm1_ms;
+    if ((k = knob_of(V_PAN1 + (int32_t)t)) >= 0) dirty_knob |= 1u << k;
+}
 static void midi_in(uint32_t notes_only)
 {
     uint8_t st, d1, d2;
@@ -743,7 +767,8 @@ static void midi_in(uint32_t notes_only)
         case 0xC0u: if (d1 < NPROG) trk_load(t, d1); break;
         case 0xB0u:
             if (d1 == 1u) { ctl_wheel[t] = d2; }
-            else if (d1 == 7u) ctl_cc7[t] = d2;
+            else if (d1 == 7u) cc_level(t, d2);
+            else if (d1 == 10u) cc_pan(t, d2);
             else if (d1 == 64u) { if (d2 >= 64u) ctl_sustain |= 1u << t; else ctl_sustain &= ~(1u << t); }
             else if (d1 == 120u || d1 == 123u) ctl_panic = 1;
             else if (d1 == 3u) {                /* (a diagnosis: the CPU, answered on channel 16; 1-16 / 17 also set
@@ -835,6 +860,15 @@ static void draw_header(void)                   /* the top strip and the program
     } else
         ui_prog(set.tprog[t], live.v + PNAME_AT, edited[t], tags, 0, t);
 }
+static void cc_text(knob_view_t *kv, int32_t id)   /* (0.5.2) REC held: "CC 74" in a badge, or "NO CC" (the
+                                                 * globals) */
+{
+    uint32_t cc = id >= 0 && id < NPARAM ? cc_of[id] : id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK ? 7u
+        : id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK ? 10u : 0u;
+    kv->value[0] = 0;
+    if (cc) { scat(kv->value, "CC "); fmt_u(kv->value + 3, cc); kv->badge = 1; }
+    else scat(kv->value, "NO CC");
+}
 static void knob_view(knob_view_t *kv, uint32_t k)
 {
     int32_t id = page_param(k);
@@ -844,10 +878,14 @@ static void knob_view(knob_view_t *kv, uint32_t k)
     kv->v = pget(id);
     kv->max = (int32_t)pmax(id);
     kv->bip = is_bip(id);
-    kv->style = KS_KNOB; kv->icl = kv->icr = IC_NONE; kv->cable = 0; kv->top = kv->bot = 0;
+    kv->style = KS_KNOB; kv->icl = kv->icr = IC_NONE; kv->cable = 0; kv->top = kv->bot = 0; kv->badge = 0;
     kv->locked = id == V_TEMPO && set.clk_src != CLK_INT;
     param_value(kv->value, id, kv->v);
-    if (is_jack(id)) { kv->style = KS_JACK; kv->cable = kv->v ? CABLE_C[kv->v % NJSRC] : 0; return; }
+    if (is_jack(id)) {
+        kv->style = KS_JACK; kv->cable = kv->v ? CABLE_C[kv->v % NJSRC] : 0;
+        if (cc_view) cc_text(kv, id);
+        return;
+    }
     if (id == P_LFO_RATE && live.v[P_LFO_SYNC]) { kv->value[0] = 0; scat(kv->value, "SYNC "); scat(kv->value, DIV_NAME[(live.v[P_LFO_SYNC] - 1u) % NCLKDIV]); }
     switch (id) {                               /* the panel's big knobs, its toggles, the signs at the scales' ends */
     case P_PITCH: case P_LFO_RATE: case P_ATTACK: case P_DECAY: case P_SUSTAIN: case P_RELEASE: case P_VOLUME:
@@ -866,6 +904,7 @@ static void knob_view(knob_view_t *kv, uint32_t k)
         if (id >= 0 && id < NPARAM && PDEF[id].kind == K_ONOFF) { kv->style = KS_TOGGLE; kv->top = "ON"; kv->bot = "OFF"; }
         break;
     }
+    if (cc_view) cc_text(kv, id);
 }
 static void page_map(pmap_t *pm)
 {
@@ -879,7 +918,7 @@ static void draw_patchbay(void)
     const item_t *it = cur_item();
     pmap_t pm;
     page_map(&pm);
-    ui_patchbay(live.v, an_swing, it->sub[cur_pg() % 5u], &pm);
+    ui_patchbay(live.v, an_swing, it->sub[cur_pg() % 5u], &pm, cc_view ? cc_of : 0);
 }
 static void draw_page(void)
 {
@@ -1106,11 +1145,18 @@ static void buttons(void)
         say(ctl_hold >> ctrk & 1u ? "HOLD ON" : "HOLD OFF");
         dirty_hdr = 1;
     }
-    if (b & (1u << BTN_REC)) {                  /* REC (0.3, the user): every effect off / on again, as they were */
-        set.fx_off ^= 1u; ctl_fx_off = set.fx_off; set_dirty = 1; set_t = fm1_ms;
-        say(set.fx_off ? "EFFECTS OFF|REC: ON AGAIN" : "EFFECTS ON|AS THEY WERE");
-        dirty_hdr = 1;
-        if (sec == S_FX) dirty_page = dirty_graph = 1;
+    if (b & (1u << BTN_REC)) { rec_down = 1; rec_t = fm1_ms; }   /* (0.5.2: held, the CCs: app_main) */
+    if (rel >> BTN_REC & 1u && rec_down) {
+        rec_down = 0;
+        if (cc_view || fm1_ms - rec_t >= REC_HOLD_MS) { cc_view = 0; dirty_page = 1; }   /* (held: the values
+                                                 * again, the effects as they were) */
+        else {                                  /* REC tapped (0.3, the user): every effect off / on again, as
+                                                 * they were (0.5.2: on the release) */
+            set.fx_off ^= 1u; ctl_fx_off = set.fx_off; set_dirty = 1; set_t = fm1_ms;
+            say(set.fx_off ? "EFFECTS OFF|REC: ON AGAIN" : "EFFECTS ON|AS THEY WERE");
+            dirty_hdr = 1;
+            if (sec == S_FX) dirty_page = dirty_graph = 1;
+        }
     }
 }
 
@@ -1297,7 +1343,7 @@ static void memory_reset(void)   /* (0.5, the user: it gives the firmware back a
     for (i = 0; i < NPSECT; i++) psect_dirty |= 1u << i;
     settings_fix();
     ctl_clk_run = 0; ctl_ext_quarter = 0;
-    for (i = 0; i < NTRK; i++) { trk_load(i, set.tprog[i]); ctl_cc7[i] = 127; nrpn_msb[i] = nrpn_lsb[i] = 127; }
+    for (i = 0; i < NTRK; i++) { trk_load(i, set.tprog[i]); nrpn_msb[i] = nrpn_lsb[i] = 127; }
     ctl_hold = 0; undo_ok = 0; save_armed = 0; layer_btn = 0xFFu;
     sec = S_HOME;
     memset(sec_item, 0, sizeof sec_item); memset(item_pg, 0, sizeof item_pg);
@@ -1331,20 +1377,26 @@ static void app_main(void)
     cc_map_init();
     for (i = 0; i < NPSECT; i++)
         if (psect_load(i, &psect[i], sizeof psect[i])
-            || (psect[i].tag != PS_TAG && psect[i].tag != PS_TAG_05 && psect[i].tag != PS_TAG_04 && psect[i].tag != PS_TAG_03
-                && psect[i].tag != PS_TAG_02 && psect[i].tag != PS_TAG_01)) {
+            || (psect[i].tag != PS_TAG && psect[i].tag != PS_TAG_06 && psect[i].tag != PS_TAG_05 && psect[i].tag != PS_TAG_04
+                && psect[i].tag != PS_TAG_03 && psect[i].tag != PS_TAG_02 && psect[i].tag != PS_TAG_01)) {
             memset(&psect[i], 0, sizeof psect[i]); psect[i].tag = PS_TAG;
-        } else if (psect[i].tag != PS_TAG) {    /* (0.1's .. 0.5's first: converted here, written so with the sector's next save) */
-            uint32_t j;
+        } else if (psect[i].tag != PS_TAG) {    /* (0.1's .. 0.5.1's: converted here, written so with the sector's next save) */
+            uint32_t j, t = psect[i].tag, z = t == PS_TAG_05 || t == PS_TAG_06;   /* (z: saved by 0.5 / 0.5.1) */
             for (j = 0; j < PS_N; j++)
                 if (psect[i].used[j >> 5] >> (j & 31u) & 1u) {
-                    if (psect[i].tag == PS_TAG_01) patch_from_01(&psect[i].p[j]);
-                    else if (psect[i].tag == PS_TAG_02) patch_from_02(&psect[i].p[j]);
-                    else if (psect[i].tag == PS_TAG_03) patch_from_03(&psect[i].p[j]);
-                    if (psect[i].tag != PS_TAG_05) patch_from_04(&psect[i].p[j]);   /* (every one before 0.5: ATTACK) */
-                    if (psect[i].tag == PS_TAG_04 || psect[i].tag == PS_TAG_05)   /* (S+H IN took the noise then) */
-                        patch_keep_sh_noise(psect[i].p[j].v);
-                    patch_drop_clock(psect[i].p[j].v);   /* (0.5.1: CLOCK's slot is GATE now) */
+                    uint8_t *v = psect[i].p[j].v;
+                    if (t == PS_TAG_01) patch_from_01(&psect[i].p[j]);
+                    else if (t == PS_TAG_02) patch_from_02(&psect[i].p[j]);
+                    else if (t == PS_TAG_03) patch_from_03(&psect[i].p[j]);
+                    if (!z) patch_from_04(&psect[i].p[j]);   /* (every one before 0.5: ATTACK) */
+                    else {                              /* (0.5.2: 0.5 / 0.5.1's ATTACK, DECAY, RELEASE: their times) */
+                        v[P_ATTACK] = ATT_FROM_051[v[P_ATTACK] & 127u];
+                        v[P_DECAY] = DEC_FROM_051[v[P_DECAY] & 127u];
+                        v[P_RELEASE] = REL_FROM_051[v[P_RELEASE] & 127u];
+                    }
+                    if (t == PS_TAG_04 || t == PS_TAG_05) patch_keep_sh_noise(v);   /* (S+H IN took the noise then) */
+                    if (t != PS_TAG_06) patch_drop_clock(v);   /* (0.5.1: CLOCK's slot is GATE now; 0.5.1's own
+                                                 * saves (MFM6) may have GATE cables: kept) */
                 }
             psect[i].tag = PS_TAG;
         }
@@ -1364,6 +1416,7 @@ static void app_main(void)
         keys_in(0);
         midi_in(0);
         buttons();
+        if (rec_down && !cc_view && fm1_ms - rec_t >= REC_HOLD_MS) { cc_view = 1; dirty_page = 1; }   /* (0.5.2) REC held */
         encoders();
         if (save_armed && fm1_ms - save_t > 8000u) { save_armed = 0; dirty_hdr = 1; say("SAVE CANCELLED"); }
         if (reset_armed && fm1_ms - reset_t > 8000u) { reset_armed = 0; dirty_hdr = 1; say("RESET CANCELLED"); }

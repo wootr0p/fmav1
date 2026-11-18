@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.2 (2026-11-18)
+
+- **ATTACK as the reference's** (the user, by ear: the reference's ATTACK at 10 o'clock sounds as 0.5.1's noon):
+  153 ms at 10 o'clock (it was at noon); 44 ms at 9 and 1.15 s at 3 (the scope's) stay; noon is ~350 ms now. The
+  factory programs and the programs saved by 0.5 / 0.5.1 keep their attack time (ATT_FROM_051; the saves' tag is
+  MFM7 now): only the knob's position moves.
+- **DECAY 1.2 s at noon** (the user; was 668 ms); 437 ms at 9 and the ends stay. The programs keep their decay
+  time as above (DEC_FROM_051).
+- **RELEASE 458 ms at 9 o'clock** (the user; was 330 ms); noon 627 ms and the ends stay; the programs keep their
+  release time the same way (REL_FROM_051). No program changes its sound.
+- **REC held shows the MIDI CCs** (the user): after half a second every knob on the screen shows its CC in a filled
+  badge (`CC 74`) instead of its value, the PATCHBAY each input's CC instead of its name; `NO CC` for the globals.
+  Let go: the values again, the effects untouched. A short tap (under half a second) still turns every effect off /
+  on, now on the release.
+- **CC 7 is the track's mixer LEVEL** (the user: the four levels with a CC): on each track's channel it moves its
+  LEVEL knob, on its scale (0-127: 100 = unity, 80 the default with four tracks), shown and saved with the
+  settings. It was a separate gain multiplying the LEVEL, unseen.
+- **CC 10 is the track's mixer PAN** (the user): 0 all left, 64 the centre, 127 all right; shown and saved the same
+  way.
+
 ## 0.5.1 (2026-11-16)
 
 - **KEYBOARD moved to SELECT pressed** (the user), its second page after UTL; HOME is the MIXER (levels, pans),

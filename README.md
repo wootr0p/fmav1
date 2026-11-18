@@ -15,7 +15,8 @@ and the folder at audio rate).
 - **The MIDI clock** (HOME > GLOBAL > CLOCK: INTERNAL, USB or TRS, the other port ignored): the LFO's SYNC (a note value,
   phase-locked, START realigns it), the arpeggiator on the clock's ticks, a tempo-synced delay. INTERNAL: TEMPO.
 - **DUMMY cables**: a plug on its own breaks an input's normal (0 V), as on a real patchbay.
-- **Chorus, delay and plate reverb**, shared as sends; **REC switches all of them off and on**, as they were.
+- **Chorus, delay and plate reverb**, shared as sends; **REC switches all of them off and on**, as they were;
+  **held, REC shows each on-screen parameter's MIDI CC**.
 - **90 factory programs** (91-99 INIT): basses, leads, patchbay tricks, rhythmic sounds, pads, keys, drums and drones,
   each INIT plus only the knobs it needs and only what the reference panel has (the effects aside), so each can be
   set up on the real instrument too.

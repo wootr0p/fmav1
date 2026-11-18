@@ -1,4 +1,4 @@
-# FMav-1 0.5.1 per M-VAVE FM-1
+# FMav-1 0.5.2 per M-VAVE FM-1
 
 Un **sintetizzatore monofonico semi-modulare** dentro l'FM-1, ricostruito controllo per controllo e presa per presa dal
 manuale d'uso del suo strumento di riferimento: un **VCO** (dente di sega → impulso, PULSE WIDTH, PWM), un **filtro
@@ -17,6 +17,26 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > **tuo rischio**: gli autori non rispondono di danni all'FM-1 (compreso un FM-1 che non si avvia più, "brickato"), ad
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
+
+## Novità della 0.5.2
+
+- **ATTACK come il riferimento**: a ore 10 fa 153 ms (prima li faceva a mezzogiorno), perché il riferimento con
+  l'ATTACK a ore 10 suona come l'FM-1 a mezzogiorno. Ore 9 resta 44 ms, ore 3 resta 1,15 s (misurato
+  all'oscilloscopio); mezzogiorno ora fa circa 350 ms. I programmi di fabbrica e quelli che hai salvato con la 0.5 e
+  la 0.5.1 tengono lo stesso attacco: cambia solo la posizione della manopola.
+- **DECAY a mezzogiorno fa 1,2 s** (prima 668 ms); ore 9 resta 437 ms, gli estremi 3 ms e 16 s. Anche qui i programmi
+  di fabbrica e quelli salvati con la 0.5 e la 0.5.1 tengono lo stesso decay.
+- **RELEASE a ore 9 fa 458 ms** (prima 330 ms); mezzogiorno resta 627 ms, gli estremi 3 ms e 18 s. Anche qui i
+  programmi tengono lo stesso release. Nessun programma cambia suono.
+- **REC tenuto premuto mostra le CC MIDI**: dopo mezzo secondo, sotto ogni manopola sullo schermo compare la sua CC
+  in un riquadro pieno (`CC 74`) al posto del valore, e sul PATCHBAY la CC di ogni presa al posto del nome; `NO CC`
+  per le impostazioni generali, che non ne hanno. Lasciato, tornano i valori e gli effetti restano come erano. Un
+  tocco breve di REC (meno di mezzo secondo) spegne e riaccende gli effetti come prima, ora al rilascio.
+- **La CC 7 è il LEVEL della traccia nel mixer** (HOME > MIXER): sul canale di ogni traccia muove la sua manopola
+  LEVEL, con la stessa scala (0-127: 100 = guadagno pieno, 80 all'accensione con quattro tracce), e il valore resta
+  salvato. Prima la CC 7 era un volume a parte, che si moltiplicava col LEVEL senza vedersi.
+- **La CC 10 è il PAN della traccia nel mixer**: 0 tutto a sinistra, 64 al centro, 127 tutto a destra; anche lui
+  si vede sulla manopola e resta salvato.
 
 ## Novità della 0.5.1
 
@@ -241,7 +261,7 @@ solo posto; i cavi si collegano da SEQ.
 | **ALGORITHM** | **La traccia** sul pannello (1-4): tastiera, pagine e PRESETS lavorano su quella |
 | **PRESETS** | Il programma 01-99 della traccia (91-99 INIT) |
 | **PLAY** | HOLD (le note restano; PLAY verde) |
-| **REC** | **Tutti gli effetti spenti / accesi** (acceso: suonano) |
+| **REC** | **Tutti gli effetti spenti / accesi** (acceso: suonano). **Tenuto** (mezzo secondo): la CC MIDI di ogni parametro sullo schermo |
 | **SAVE** | Premuto: `SAVE TO n?` (PRESETS sceglie lo slot), SAVE di nuovo: salvato (scritto quando c'è silenzio). **Tenuto + tasto**: F3 INIT, G3 suono casuale, A3 MUTATE, G5 azzera la memoria (OCT+ conferma) |
 | **EDIT + OCT- / OCT+** | Undo / redo |
 | **OCT- / OCT+** | Ottava della tastiera (entrambi: ottava 0); i loro LED la mostrano |
@@ -314,7 +334,7 @@ loro carattere (tempi, feedback, decay…) è quello del suono della prima tracc
 - **TRS MIDI IN** dell'FM-1 (adattatore TRS-DIN tipo A o B) o USB.
 - **HOME → GLOBAL → MIDI CH = N** (di serie **1**): il canale N suona la **traccia 1**, N+1 la **2**, N+2 la **3**,
   N+3 la **4**, qualunque traccia sia sul pannello. Con **OMNI** tutto suona la traccia sul pannello.
-- Note, pitch bend, aftertouch, mod wheel (CC 1), volume della traccia (CC 7), sustain (CC 64), program change, e **una
+- Note, pitch bend, aftertouch, mod wheel (CC 1), il LEVEL e il PAN della traccia nel mixer (CC 7 e CC 10), sustain (CC 64), program change, e **una
   CC per ogni parametro, cavi ed effetti compresi** (`CC-NRPN.md`). Con un **p-lock sulla CC di una presa** il Digitakt
   cambia il cavo a quel passo.
 - **CC fisse**: 74 CUTOFF, 71 RESONANCE, 73 ATTACK, 72 RELEASE, 75 DECAY, 5 GLIDE, 93 CHORUS SEND, 92 DELAY SEND,

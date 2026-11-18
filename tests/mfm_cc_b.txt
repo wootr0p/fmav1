@@ -1,0 +1,34 @@
+# REC held: the MIDI CCs, run B (0.5.2: tools/gen_ui_tests.py; the same [4200, 5300, 7800], different [4900, 5700])
+# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SAVE 10 ARP 11 SEQ 12 PLAY 13 REC
+# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS
+2100 btn 2
+4200 shot
+4300 btndown 13
+4900 shot
+5000 btnup 13
+5300 shot
+5400 btn 13
+5700 shot
+5800 btn 13
+7800 shot
+8000 btn 11
+8100 btndown 13
+8700 shot
+8800 btnup 13
+8900 btn 7
+9000 btndown 13
+9600 shot
+9700 btnup 13
+9800 btn 8
+9850 midi 0xB1 7 40
+9880 shot
+9900 btndown 13
+10500 shot
+10600 btnup 13
+10700 btn 8
+10750 midi 0xB2 10 0
+10800 shot
+10850 btndown 13
+11400 shot
+11500 btnup 13
+11700 end
