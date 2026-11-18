@@ -5,8 +5,8 @@ manuale d'uso del suo strumento di riferimento: un **VCO** (dente di sega → im
 ladder a transistor a 4 poli** che auto-oscilla, l'**LFO** (0,165-550 Hz, triangolo → quadra, anche **a tempo**),
 l'**EG ADSR**, il **VCA** con l'interruttore **VCA MODE**, la **tastiera** (priorità alla nota più bassa, legato, GLIDE,
 KB SCALE), il **wave folder**, il **Sample + Hold**, il **mixer ONE+TWO**, l'**attenuatore**, il **rumore bianco** e il
-**patchbay** con le sue **normalizzazioni**. Ogni manopola gira e suona come quella del riferimento (tarata sulle
-sue registrazioni). Nessun sequencer: si suona dal Digitakt via MIDI TRS (o USB, o dai tasti).
+**patchbay** con le sue **normalizzazioni**. Le manopole girano come quelle del riferimento; la taratura sul suono
+dello strumento vero è ancora in corso. Nessun sequencer: si suona dal Digitakt via MIDI TRS (o USB, o dai tasti).
 
 **Quattro tracce** stile Felucca, ognuna col suo suono, sui canali MIDI N, N+1, N+2, N+3. **Chorus, delay e riverbero**
 in comune. **90 programmi di fabbrica**, dal 91 al 99 INIT.

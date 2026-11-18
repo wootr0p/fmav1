@@ -8,9 +8,8 @@ patchbay of 12 inputs with their normals,
 every cable running a sample at a time (the LFO, the S+H and the VCO patch into the pitch, the pulse width, the cutoff
 and the folder at audio rate).
 
-- **Calibrated against the reference instrument**: every knob drawn and turning as its panel's (7 to 5 o'clock), its
-  laws fitted to recordings, scope captures and photos of the real unit, so a knob set at 2 o'clock there sounds as
-  here at 2 o'clock.
+- **Knobs modelled on a reference panel**: drawn and turning as its knobs do (7 to 5 o'clock), their ranges tuned on
+  recordings of a real unit; the tuning is still going on.
 - **Four monophonic tracks**, each its own sound, on MIDI channels N .. N+3 (fixed; ALGORITHM picks the panel's).
 - **The MIDI clock** (HOME > GLOBAL > CLOCK: INTERNAL, USB or TRS, the other port ignored): the LFO's SYNC (a note value,
   phase-locked, START realigns it), the arpeggiator on the clock's ticks, a tempo-synced delay. INTERNAL: TEMPO.
