@@ -41,6 +41,20 @@ ccv() {   # (0.5.2) REC held: the CCs; let go: as before, the effects untouched;
     return 0
 }
 run "REC held: the MIDI CCs on the screen, the effects untouched; a tap: the effects off / on (build/host/cc_b-*.png)" ccv
+run "the screen reader (0.6): what a reader hears, page by page, knob by knob, every message" sh tests/run_host.sh tests/mfm_sr.txt sr
+sra() {   # (0.6) fm1-reader's audit of every page, value and message (needs ../fm1-reader, Node.js, a word list)
+    sh tests/sr_audit.sh > "$OUT/sr_audit.txt" 2>&1; r=$?
+    [ $r = 2 ] && { echo "   SKIPPED: $(tail -1 "$OUT/sr_audit.txt")"; return 0; }
+    [ $r = 0 ] || tail -30 "$OUT/sr_audit.txt"
+    return $r
+}
+run "the screen reader's audit: real words, no repeats, short enough (build/host/sr_audit.txt)" sra
+run "the FM-1's own voice and fm1-reader say the same words, every one in its dictionary" sh tests/voice_words.sh
+voice() {   # (0.6) PLAY held 2 s: the voice on, its texts; the outputs speak, then quiet once it is off
+    sh tests/run_host.sh tests/mfm_voice.txt voice > "$OUT/voice.txt" 2>&1 || { grep FAIL "$OUT/voice.txt"; return 1; }
+    python3 tools/voice_wav.py "$OUT/voice.wav" 2.3-4.1:quiet 4.3-5.5:speech 10.3-11.5:speech 30.2-31.4:quiet
+}
+run "the FM-1's own voice: PLAY held 2 s on and off, the outputs speak (build/host/voice.wav)" voice
 run "four tracks: channels N .. N+3, ALGORITHM, the mixer (build/host/tracks-*.png)" sh tests/run_host.sh tests/mfm_tracks.txt tracks
 run "the worst case on four tracks: everything at audio rate on each, chorus, delay and reverb" sh tests/run_host.sh tests/mfm_cpu.txt cpu4
 run "the screens for the manual: a lead's pages, the patchbay (build/host/screens-*.png)" sh tests/run_host.sh tests/mfm_screens.txt screens

@@ -8,8 +8,9 @@ HDR = ("# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SA
        "# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS\n")
 
 # ---- every section (its button), every page (SELECT turned), a note held so the live graphs show it
-SECTIONS = [(8, 5), (6, 2), (4, 2), (5, 1), (2, 7), (11, 4), (3, 2), (10, 1), (7, 2)]   # (button, its pages: 4 tracks;
-# 0.5: HOME the MIXER, VOICE, GLOBAL; EDIT the VCO; GLO the VCF; 0.5.1: SELECT pressed UTL, KEYBOARD)
+SECTIONS = [(8, 6), (6, 2), (4, 2), (5, 1), (2, 7), (11, 4), (3, 2), (10, 2), (7, 2)]   # (button, its pages: 4 tracks;
+# 0.5: HOME the MIXER, VOICE, GLOBAL; EDIT the VCO; GLO the VCF; 0.5.1: SELECT pressed UTL, KEYBOARD; 0.6: HOME's
+# READER, ARP's second page)
 L = ["# every section, every page (SELECT turned; SELECT pressed: UTL), a note held so the live graphs show it\n" + HDR
      + "1500 midi 0xC0 2 0\n1600 midi 0x90 48 100"]
 L.append("2000 btn 4")   # (0.5: HOME is open at power-on: from another section it opens on its first page; after

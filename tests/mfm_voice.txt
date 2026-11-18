@@ -1,0 +1,37 @@
+# (0.6) the FM-1's own voice (mfm_voice.h): PLAY held 2 s turns it on ("SCREEN READER ON", then the page), the
+# outputs hear it (build/host/voice.wav, to listen to); a page, a knob, PRESETS, a PLAY tap (HOLD), REC; PLAY held 2 s
+# again: "SCREEN READER OFF", and then quiet. tests/run_tests.sh checks the texts (a reader listens too: listen /
+# said) and where the WAV speaks (tools/voice_wav.py)
+# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SAVE 10 ARP 11 SEQ 12 PLAY 13 REC
+# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS
+2050 listen
+2100 said PROGRAM 1 BRASS LEAD
+2200 btndown 12
+4100 said_none
+4300 said SCREEN READER ON
+4400 btnup 12
+4500 said_none
+10000 btn 7
+10300 said 1 OF 2. FILTER
+12500 enc 2 3
+13100 said CUTOFF
+14500 btn 4
+14800 said 1 OF 2. ENVELOPE
+17000 btn 2
+17300 said 1 OF 7. DELAY
+20500 enc 6 1
+21100 said PROGRAM 2 CLASSIC LEAD
+22500 btn 12
+22600 said HOLD ON
+23500 btn 13
+23600 said EFFECTS. ENGINE OFF
+23700 btndown 2
+24800 said 2 SEND 23%
+24900 btnup 2
+24950 said_none
+25000 btndown 12
+28100 said SCREEN READER OFF
+28200 btnup 12
+28300 said_none
+30000 btn 7
+31500 end

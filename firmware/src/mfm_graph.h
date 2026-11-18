@@ -376,15 +376,6 @@ static void ui_patchbay(const uint8_t *pv, const int16_t *swing, const char *sub
             const pbcell_t *e = &PB[r][c];
             int32_t x = PB_X((int32_t)c), y = PB_Y((int32_t)r), w = aa_wt(&FA8, e->lbl, -1) + 4;
             if (e->out) { cv_round(x - w / 2, y - 15, w, 9, C_INK); aa_textt(x - w / 2 + 2, y - 15, &FA8, e->lbl, C_SH, -1); }
-            else if (cc) {                      /* (0.5.2) REC held: each input's MIDI CC instead of its name, in a
-                                                 * badge (the patch's yellow: the outputs' are white) */
-                char s[8] = "CC ";
-                int32_t bw;
-                fmt_u(s + 3, cc[PJ(e->id)]);
-                bw = aa_w(&FA8, s) + 4;
-                cv_round(x - bw / 2, y - 15, bw, 9, C_JACK);
-                aa_textt(x - bw / 2 + 2, y - 15, &FA8, s, C_SH, -1);
-            }
             else aa_label_c(x, y - 15, &FA8, e->lbl, pv[PJ(e->id)] ? C_INK : C_INK2, 60);
             cv_jack(x, y, 5, 0, 0);
         }
@@ -433,6 +424,19 @@ static void ui_patchbay(const uint8_t *pv, const int16_t *swing, const char *sub
         pb_plug(ox, oy, CABLE_C[s]);
         pb_plug(ix, iy, CABLE_C[s]);
     }
+    if (cc)                                     /* (0.6, the user) REC held: each input's MIDI CC in a badge over its
+                                                 * jack (the patch's yellow), its name and cable left in view */
+        for (r = 0; r < PB_ROWS; r++)
+            for (c = 0; c < 3u; c++) {
+                const pbcell_t *e = &PB[r][c];
+                char s[8] = "CC ";
+                int32_t x = PB_X((int32_t)c), y = PB_Y((int32_t)r), bw;
+                if (e->out) continue;
+                fmt_u(s + 3, cc[PJ(e->id)]);
+                bw = aa_w(&FA8, s) + 4;
+                cv_round(x - bw / 2, y - 4, bw, 9, C_JACK);
+                aa_textt(x - bw / 2 + 2, y - 4, &FA8, s, C_SH, -1);
+            }
     cv_blit(0, 48);
 }
 
@@ -571,7 +575,7 @@ static void g_kb(const uint8_t *pv, uint16_t c)
 static void g_arp(const uint8_t *pv, uint16_t c)
 {
     static const uint8_t CH[3] = {0, 4, 7};
-    uint32_t mode = pv[P_ARP_MODE] % NAR, oct = pv[P_ARP_OCT] % 4u + 1u, total = 3u * oct, i, rnd = 0x9E3779B9u;
+    uint32_t mode = pv[P_ARP_ON] ? AR_UP + pv[P_ARP_MODE] % (NAR - 1u) : AR_OFF, oct = pv[P_ARP_OCT] % 4u + 1u, total = 3u * oct, i, rnd = 0x9E3779B9u;
     int32_t gate = 3 + pv[P_ARP_GATE] * 9 / 127, top = 12 * (int32_t)oct - 5;   /* (the highest note: G of the last octave) */
     g_begin();
     for (i = 0; i < 16u; i++) {
@@ -593,20 +597,37 @@ static void g_arp(const uint8_t *pv, uint16_t c)
     g_end();
 }
 
+/* ---- (0.6, the user) HOME > READER: how to turn the screen reader on, big, where a graph would be */
+static void g_read(void)
+{
+    cv_begin(240, 62, C_BG);
+    cv_round(7, 1, 226, 60, C_SCREEN);
+    cv_frame(6, 0, 228, 62, RGB(90, 90, 94));
+    aa_text_c(120, 6, &FA12, "FOR  ACTIVATE  THE", C_INK);   /* (two spaces: the font's are narrow) */
+    aa_text_c(120, 23, &FA12, "SCREEN READER,", C_INK);
+    aa_text_c(120, 40, &FA12, "HOLD PLAY/STOP", C_ACC);
+    g_end();
+}
 /* ---- the tracks: their levels as they play */
+static int32_t g_trk_pk[4];                     /* (each track's meter, as it falls) */
+static int32_t g_trk_h(uint32_t t)              /* a track's meter's height on the screen (0: nothing shows) */
+{
+    int32_t b = 0, lg, p = g_trk_pk[t & 3u];
+    while (b < 20 && (p >> b)) b++;             /* (a log meter: ~6 dB a bit, 60 dB over its height) */
+    lg = b ? b * 256 + ((p << 8 >> (b - 1)) - 256) : 0;
+    return clampi((lg - 7 * 256) * 38 / (10 * 256), 0, 38);
+}
 static void g_tracks(uint32_t ti)
 {
-    static int32_t pk[4];
+    int32_t *pk = g_trk_pk;
     uint32_t t;
     int32_t pitch = NTRK > 1u ? 52 : 100, x0 = NTRK > 1u ? 18 : 100;
     g_begin();
     for (t = 0; t < NTRK; t++) {
-        int32_t p = (int32_t)ui_trk_peak[t], h, b = 0, lg, x = x0 + pitch * (int32_t)t;
+        int32_t p = (int32_t)ui_trk_peak[t], h, b, x = x0 + pitch * (int32_t)t;
         ui_trk_peak[t] = 0;
         pk[t] = p > pk[t] ? p : pk[t] - (pk[t] >> 3);
-        while (b < 20 && (pk[t] >> b)) b++;     /* (a log meter: ~6 dB a bit, 60 dB over its height) */
-        lg = b ? b * 256 + ((pk[t] << 8 >> (b - 1)) - 256) : 0;
-        h = clampi((lg - 7 * 256) * 38 / (10 * 256), 0, 38);
+        h = g_trk_h(t);
         cv_round(x, GY0 + 2, 40, 41, RGB(22, 24, 28));
         for (b = 0; b < 38; b += 4) cv_rect(x + 4, GY0 + 41 - b, 32, 1, RGB(30, 33, 38));
         if (h) cv_round(x + 6, GY0 + 42 - h, 28, h, TRKC[t & 3u]);

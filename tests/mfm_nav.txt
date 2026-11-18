@@ -14,19 +14,19 @@
 3200 shot
 3300 enc 0 1
 3500 shot
-3600 btn 6
+3600 enc 0 1
 3800 shot
-3900 enc 0 1
+3900 btn 6
 4100 shot
-4200 btn 4
+4200 enc 0 1
 4400 shot
-4500 enc 0 1
+4500 btn 4
 4700 shot
-4800 btn 5
+4800 enc 0 1
 5000 shot
-5100 btn 2
+5100 btn 5
 5300 shot
-5400 enc 0 1
+5400 btn 2
 5600 shot
 5700 enc 0 1
 5900 shot
@@ -38,23 +38,27 @@
 6800 shot
 6900 enc 0 1
 7100 shot
-7200 btn 11
+7200 enc 0 1
 7400 shot
-7500 enc 0 1
+7500 btn 11
 7700 shot
 7800 enc 0 1
 8000 shot
 8100 enc 0 1
 8300 shot
-8400 btn 3
+8400 enc 0 1
 8600 shot
-8700 enc 0 1
+8700 btn 3
 8900 shot
-9000 btn 10
+9000 enc 0 1
 9200 shot
-9300 btn 7
+9300 btn 10
 9500 shot
 9600 enc 0 1
 9800 shot
-9900 midi 0x80 48 0
-10400 end
+9900 btn 7
+10100 shot
+10200 enc 0 1
+10400 shot
+10500 midi 0x80 48 0
+11000 end

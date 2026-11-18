@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# FMav-1's words for a screen reader (fm1-reader): the text on the screen <TAB> what to say. "#" takes a number and
+# says it. tools/gen_words.py turns this into docs/words/<id>.json (published on the site: never change or delete
+# one, a device points at it) and firmware/gen/ann_words.h (the link the device sends). A line starting "#" with a
+# tab in it is an entry ("# c<TAB># cents").
+# (0.6, the user) FMav-1 says its short words in full itself (mfm_speak.h SP_WORDS: "TIME L" is sent as "TIME
+# LEFT"), so a reader without this file (offline, or before it is published) says them right too: nothing of
+# FMav-1's own is needed here; the file still carries the common words gen_words.py adds.
+# url: https://wootr0p.github.io/fmav1/words/

@@ -1,4 +1,4 @@
-# FMav-1 0.5.2 per M-VAVE FM-1
+# FMav-1 0.6 per M-VAVE FM-1
 
 Un **sintetizzatore monofonico semi-modulare** dentro l'FM-1, ricostruito controllo per controllo e presa per presa dal
 manuale d'uso del suo strumento di riferimento: un **VCO** (dente di sega → impulso, PULSE WIDTH, PWM), un **filtro
@@ -17,6 +17,50 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > **tuo rischio**: gli autori non rispondono di danni all'FM-1 (compreso un FM-1 che non si avvia più, "brickato"), ad
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
+
+## Novità della 0.6
+
+- **Lettore di schermo** (per chi non vede lo schermo), in due modi con le stesse parole: dal computer, la pagina
+  <https://charlesvestal.github.io/fm1-reader/> (Chrome o Edge, l'FM-1 via USB, premi **Connect**: con la sua voce o
+  con VoiceOver, NVDA, JAWS, TalkBack); oppure **la voce dell'FM-1**, senza computer: **PLAY tenuto 2 secondi** la
+  accende ("SCREEN READER ON", poi la pagina) o la spegne ("SCREEN READER OFF"), e resta così anche spegnendo l'FM-1.
+  Cosa dice:
+  - appena collegato o accesa la voce: il programma e la traccia, poi la pagina;
+  - una pagina nuova (un tasto di sezione, SELECT): quale pagina è fra quelle del suo tasto e solo il titolo ("1 OF 7.
+    DELAY"; il VCO "OSCILLATOR", il VCF "FILTER", l'arpeggiatore "ARPEGGIATOR", senza stato né modo; un tasto con una pagina sola: solo il titolo); la prima pagina del patchbay dice i cavi ("LFO TO PWM"); lo
+    stesso tasto di nuovo su una sezione con una pagina sola la rilegge;
+  - una manopola toccata, la prima della pagina o un'altra dall'ultima: subito il suo nome ("L F O RATE"; un
+    interruttore: il suo ON / OFF);
+  - **un tasto di sezione tenuto mezzo secondo** (quanto REC per le CC): la sua pagina col valore di ogni manopola (ora i tasti agiscono al
+    rilascio, come già EDIT e GLO); nel mixer di HOME, PLAYING dopo la traccia che suona (la sua barra si vede);
+  - una manopola con **pochi valori** (25 al massimo: un interruttore, un modo, un **cavo** "LFO TO FOLD IN", un valore
+    di nota, BEND): **ogni valore mentre cambia**; le altre non dicono niente mentre giri, ma il **valore se le giri
+    tenendo REC** (quando ti fermi) e il **valore e MINIMUM / MAXIMUM appena raggiungi un estremo** ("CUTOFF 19
+    KILOHERTZ, MAXIMUM"); PRESETS il programma (o lo slot dove SAVE salva), ALGORITHM la traccia, SELECT la pagina, quando
+    ti fermi; non l'ottava (suonando si sente); girare una manopola interrompe la lettura della pagina;
+  - ogni messaggio dello schermo (KEYBOARD HOLD, gli effetti, SAVE, undo, la domanda del reset); gli avvisi interi;
+  - mai una CC MIDI, mai il suggerimento in basso a destra dello schermo.
+  Parla in inglese, come lo schermo, e dice le abbreviazioni per intero: TIME L "time left", KB "keyboard", EG
+  "envelope", AMT "amount", 1V/OCT "1 volt per octave", PRIO "legato priority", LIGHTS "lights brightness", GLIDE
+  "portamento", SYNC "synchronization", BEND "pitch bend", FOLD "wave fold", ANALOG "analog effect", TUNE "global tune", ONE (-5) "one
+  normalized to minus five", il TYPE del chorus 1, 2, 1 plus 2, free; gli interruttori col nome intero ("VCA MODE
+  SWITCH"). Un solo punto del firmware scrive ogni frase e la manda a tutti e due, quindi non possono differire: i
+  test controllano che ogni parola sia nel dizionario della voce e che la pagina le dica uguali. Finché nessuna
+  pagina lo chiede non manda niente (un DAW sulla stessa porta non vede nulla). La voce è quella di Bigorna (sintesi
+  a formanti Klatt, come il DECtalk; di Nuno Zimas): si sente in cuffia e dall'uscita, con la musica 6 dB più bassa
+  mentre parla, non nell'audio USB; fa una pausa sulle virgole e sui punti.
+- **HOME > READER** (l'ultima pagina di HOME): **VOLUME** (0-10, sul volume della manopola MASTER), **SPEED** (1-9: 1 la più lenta, 4 all'inizio) e
+  **PITCH** (80-200 Hz) della voce; la pagina mostra in grande "FOR ACTIVATE THE SCREEN READER, HOLD PLAY/STOP".
+- **REC tenuto**: dice "TURN A KNOB TO KNOW ITS VALUE"; la CC MIDI di ogni manopola in un riquadro sopra la manopola, il valore resta visibile (nel patchbay
+  sopra ogni presa); se giri una manopola tenendo REC, lasciandolo gli effetti non si spengono.
+- **PLAY**: un tocco è HOLD come prima, ora al rilascio; il messaggio è **KEYBOARD HOLD ON / OFF**.
+- **REC** con un tocco: **EFFECTS ENGINE OFF / ON** (a voce "EFFECTS. ENGINE OFF").
+- **SAVE** dice "SAVE PRESET, ROTATE THE PRESET KNOB FOR SELECT THE SLOT, SAVE AGAIN FOR CONFIRM"; tenuto (0,6 s,
+  prima di un tasto) dice i tasti che apre ("F3 INIT, G3 RANDOM. A3 MUTATE, G5 RESET").
+- **ARPEGGIATORE**: la manopola 1 è il suo **interruttore ON / OFF** (CC 89), **MODE** ha solo i modi (UP .. RANDOM),
+  **GATE** sta in una seconda pagina (ARP di nuovo). I programmi salvati prima tengono il loro arpeggiatore: MODE OFF
+  diventa l'interruttore spento, un modo l'interruttore acceso con quel modo.
+- Girare TEMPO con un clock esterno dice cosa non è successo: "TEMPO NOT CHANGED, THE USB CLOCK SETS IT".
 
 ## Novità della 0.5.2
 
@@ -249,19 +293,19 @@ solo posto; i cavi si collegano da SEQ.
 
 | Pulsante | Le pagine che SELECT scorre |
 | --- | --- |
-| **HOME** | **MIXER**: i LEVEL delle 4 tracce · i loro PAN → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, CLOCK, TEMPO · KEY VEL, LIGHTS (in alto a destra la CPU) |
+| **HOME** | **MIXER**: i LEVEL delle 4 tracce · i loro PAN → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, CLOCK, TEMPO · KEY VEL, LIGHTS (in alto a destra la CPU) → **READER**: VOLUME, SPEED, PITCH della voce |
 | **EDIT** | **VCO**: PITCH, VCO WAVE, PULSE WIDTH, FINE · **MOD**: VCO MOD MIX, PITCH MOD AMT, PWM AMT |
 | **ENV** | **EG**: ATTACK, DECAY, SUSTAIN, RELEASE → **VCA**: VOLUME, **VCA MODE** (EG / ON) |
 | **LFO** | **LFO**: LFO RATE, LFO WAVE, **SYNC**, RATE FINE |
 | **FX** | **DELAY**: ON, SEND, TIME L, TIME R · FEEDBACK, PING-PONG, WIDTH · LOW CUT, HIGH CUT → **REVERB**: ON, SEND, DECAY, DAMP · PRE-DELAY, DIFFUSION, WIDTH → **CHORUS**: ON, TYPE, SEND · RATE, DEPTH |
 | **SEQ** | **PATCHBAY**: tutti i cavi → **INPUTS** 1-4: FOLD IN, 1V/OCT, PWM, ONE · 5-8: LFO RATE, CUTOFF, GATE, VCA CV · 9-12: TWO, S+H (VCO), S+H GATE, ATTN |
 | **SELECT premuto** | **UTL**: FOLD, ONE LVL, ATTENUATOR, **NOISE** → **KEYBOARD**: KB SCALE, GLIDE, PRIO, RETRIG |
-| **ARP** | L'arpeggiatore: MODE (OFF: spento), OCTAVES, RATE, GATE |
+| **ARP** | L'arpeggiatore: ARP (acceso / spento), MODE, OCTAVES, RATE; di nuovo: GATE |
 | **GLO** | **VCF**: CUTOFF, RESONANCE, CUT FINE · **MOD**: VCF MOD MIX, VCF MOD AMT |
 | **ALGORITHM** | **La traccia** sul pannello (1-4): tastiera, pagine e PRESETS lavorano su quella |
 | **PRESETS** | Il programma 01-99 della traccia (91-99 INIT) |
-| **PLAY** | HOLD (le note restano; PLAY verde) |
-| **REC** | **Tutti gli effetti spenti / accesi** (acceso: suonano). **Tenuto** (mezzo secondo): la CC MIDI di ogni parametro sullo schermo |
+| **PLAY** | KEYBOARD HOLD (le note restano; PLAY verde). **Tenuto 2 secondi**: la voce del lettore di schermo accesa / spenta |
+| **REC** | **Tutti gli effetti spenti / accesi** (acceso: suonano). **Tenuto** (mezzo secondo): la CC MIDI di ogni parametro sullo schermo; una manopola girata tenendolo: il lettore dice il suo valore |
 | **SAVE** | Premuto: `SAVE TO n?` (PRESETS sceglie lo slot), SAVE di nuovo: salvato (scritto quando c'è silenzio). **Tenuto + tasto**: F3 INIT, G3 suono casuale, A3 MUTATE, G5 azzera la memoria (OCT+ conferma) |
 | **EDIT + OCT- / OCT+** | Undo / redo |
 | **OCT- / OCT+** | Ottava della tastiera (entrambi: ottava 0); i loro LED la mostrano |

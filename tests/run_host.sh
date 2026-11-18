@@ -6,6 +6,8 @@ set -e
 cd "$(dirname "$0")/.."
 mkdir -p build/host
 N=${2:-fmav1}
+python3 tools/gen_words.py firmware/words.tsv docs/words firmware/gen/ann_words.h >/dev/null   # (0.6: the screen reader's words)
+python3 tools/gen_speech.py tools/voice_words.txt firmware/gen/voice_dict.h >/dev/null   # (0.6: the voice's dictionary)
 cc -O2 -Wall -Wno-unused-function -Wno-missing-field-initializers -DOBV_HOST ${MFM_NTRK:+-DMFM_NTRK=${MFM_NTRK}u} -DAPP_VER="\"${APP_VER:-dev}\"" -Ifirmware/src -Ifirmware/gen -o build/host/fmav1 firmware/src/fmav1.c
 build/host/fmav1 build/host/$N ${1:+"$1"}
 python3 - "$N" <<'PY2'

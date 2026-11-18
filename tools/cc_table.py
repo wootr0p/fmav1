@@ -30,6 +30,7 @@ NAME = {
     "P_NOISE": "NOISE: il rumore bianco nel VCF *",
     "P_CUT_FINE": "VCF CUTOFF FINE (64 = 0, +-2 semitoni) *",
     "P_LFO_FINE": "LFO RATE FINE (64 = 0, +-2 semitoni) *",
+    "P_ARP_ON": "ARP ON / OFF *",
 }
 JIN = ["1V/OCT", "PWM", "CUTOFF", "VCA CV", "LFO RATE", "GATE", "FOLD IN", "S+H IN (senza cavo: VCO)", "S+H GATE", "ONE", "TWO", "ATTN",
        "(MULT: non c'è più, ignorata)"]

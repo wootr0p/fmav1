@@ -24,12 +24,19 @@ static void app_idle(void);
 #define APP_NAME "FMAV-1"
 #define CV_MAX (240u * 192u)                    /* (0.2: the patchbay draws 240 x 192 at once) */
 #include "platform.c"
+/* (0.6) the screen reader (fm1-reader): announce.c is fm1-base's shared copy (fm1-reader tools/sync_announce.sh;
+ * never edited here), ann_words.h the link to this build's words file (tools/gen_words.py, firmware/words.tsv);
+ * what is said: mfm_speak.h */
+#define ANN_NAME APP_NAME " " APP_VER
+#include "ann_words.h"
+#include "announce.c"
 #include "mfm_params.h"
 #include "mfm_dsp.h"
 #include "mfm_engine.h"
 #include "mfm_patches.h"
 #include "mfm_ui.h"
 #include "cpu_meter.h"
+#include "mfm_voice.h"                          /* (0.6) the FM-1's own voice (Bigorna's, Nuno Zimas) */
 
 static cpu_meter_t cpu_m;
 
@@ -40,8 +47,7 @@ static void app_audio(int32_t *out, uint32_t n)
 #endif
     engine_audio(out, n);
 #ifndef OBV_HOST
-    ui_render_us = (fm1_ticks() - t0) / FM1_TICKS_PER_US;
-    cpu_meter_add(&cpu_m, ui_render_us, fm1_ms);
+    ui_render_us = (fm1_ticks() - t0) / FM1_TICKS_PER_US;   /* (0.6: the meter after the voice, app_audio_out) */
 #endif
 }
 
@@ -56,9 +62,13 @@ typedef struct {
     uint8_t kvel, lights;                       /* kvel: the keys' velocity; lights: the backlight + 1 (0: the default) */
     uint8_t tprog[NTRK], lvl[NTRK];             /* each track's program; the mixer's level (100 = unity) */
     int8_t pan[NTRK];                           /* the mixer's pan -64..64 */
-    uint8_t fx_off, clk_src, spare[2];          /* 0.3: REC off: every effect off (the sounds keep theirs); 0.4.1: the
-                                                 * clock's source, CLK_INT / CLK_USB / CLK_TRS */
+    uint8_t fx_off, clk_src, voice, spare;      /* 0.3: REC off: every effect off (the sounds keep theirs); 0.4.1: the
+                                                 * clock's source, CLK_INT / CLK_USB / CLK_TRS; 0.6: the FM-1's own
+                                                 * voice, the screen reader (PLAY held 2 s) */
+    uint8_t vo_set, vo_vol, vo_speed, vo_pitch; /* (0.6, the user) HOME > READER: the voice's VOLUME 0..10, SPEED
+                                                 * 0..8 (1..9 shown), PITCH (VO_PITCH_HZ); vo_set not 2: the defaults */
 } settings_t;
+#define SET_SIZE_05 __builtin_offsetof(settings_t, vo_set)   /* (0.3 .. 0.6's first builds' save: up to spare) */
 static settings_t set;
 #define SET_SIZE_02 __builtin_offsetof(settings_t, fx_off)   /* (0.2's save: up to pan) */
 enum { CLK_INT, CLK_USB, CLK_TRS };             /* (0.4.1, the user: the tempo internal, or synced over USB or the TRS) */
@@ -151,11 +161,20 @@ static uint8_t edited[NTRK];
 static uint32_t save_armed, save_to, save_t;
 static patch_t undo_p;
 static uint32_t undo_ok, undo_trk;
+static uint32_t sp_reread;                      /* (0.6) mfm_speak.h: a section's button pressed */
+static uint32_t sp_values;                      /* (0.6) mfm_speak.h: the page with its values (a button held REC_HOLD_MS) */
+static uint32_t sp_turn_rec;                    /* (0.6) mfm_speak.h: a knob turned while REC is held */
 static uint32_t dirty_hdr = 1, dirty_page = 1, dirty_map = 1, dirty_knob, dirty_graph = 1, t_graph, graph_played;
 static const char *toast;
 static uint32_t toast_t;
 static char toast_buf[40];
-static void say(const char *s) { toast = s; toast_t = fm1_ms; dirty_map = 1; }
+static void ann_toast(const char *s, uint32_t flags);   /* (0.6) a screen reader hears it too (mfm_speak.h) */
+static void say(const char *s) { toast = s; toast_t = fm1_ms; dirty_map = 1; ann_toast(s, ANN_NOW); }
+/* (0.6) something did not happen: a screen reader says it whole (what follows does not cut it off) */
+static void warn(const char *s) { toast = s; toast_t = fm1_ms; dirty_map = 1; ann_toast(s, ANN_NOW | ANN_KEEP); }
+/* (0.6) a message whose spoken words are longer than the screen's two lines (the user's SAVE); one shown, not said */
+static void say_as(const char *screen, const char *spoken) { toast = screen; toast_t = fm1_ms; dirty_map = 1; ann_toast(spoken, ANN_NOW); }
+static void show(const char *s) { toast = s; toast_t = fm1_ms; dirty_map = 1; }
 
 /* the sections: a button each, a list of items (the button tapped again steps through them), each with up to five
  * pages of four knobs (SELECT turns the pages, across the items). 0.3 (the user): no switch on SELECT any more: what
@@ -171,6 +190,9 @@ enum { AC_PERF, AC_VCO, AC_VCF, AC_ENV, AC_LFO, AC_UTL, AC_JACK, AC_GLOB, AC_FX 
 #define V_CLKSRC 205                            /* (0.4.1) the clock's source */
 #define V_LVL1 208                              /* the mixer: the levels, the pans (NTRK each) */
 #define V_PAN1 212
+#define V_VOVOL 216                             /* (0.6) HOME > READER: the voice */
+#define V_VOSPD 217
+#define V_VOPITCH 218
 #define NONE (-1)
 /* an item: its title, which knobs on which page, its accent, the module tab it lights, each page's graph and subtitle,
  * a hint for the footer */
@@ -188,6 +210,9 @@ static const item_t IT_HOME[] = {
     {"VOICE", 1, AC_GLOB, TAB_NONE, {G_SCOPE}, {0}, {{P_BEND, P_DRIFT, NONE, NONE}}, "ANALOG: THE|DRIFT"},
     {"GLOBAL", 2, AC_GLOB, TAB_NONE, {G_SCOPE, G_SCOPE}, {0, 0}, {{V_MIDICH, V_TUNE, V_CLKSRC, V_TEMPO}, {V_KVEL, V_LIGHTS, NONE, NONE}},
         NTRK > 1 ? "CH N: TRACK 1|N+1: TRACK 2 .." : "MIDI CH: THE|TRACK'S CHANNEL"},
+    {"READER", 1, AC_GLOB, TAB_NONE, {G_READ}, {0}, {{V_VOVOL, V_VOSPD, V_VOPITCH, NONE}},   /* (0.6, the user) the
+                                                 * FM-1's own voice */
+        "HOLD PLAY: SCREEN|READER ON / OFF"},
 };
 #define HOME_GLOBAL 2u                          /* IT_HOME's GLOBAL (its CPU meter) */
 /* (0.4, the user: no knob twice) the cables only on SEQ, TEMPO only on GLOBAL */
@@ -234,12 +259,13 @@ static const item_t IT_FX[] = {                 /* FX: the delay, the reverb (sh
     {"CHORUS", 2, AC_FX, TAB_FX, {G_CHO, G_CHO}, {0, 0}, {{P_CH_ON, P_CH_TYPE, P_CH_MIX, NONE}, {P_CH_RATE, P_CH_DEPTH, NONE, NONE}},
         "REC: EVERY|EFFECT OFF / ON"},
 };
-static const item_t IT_ARP[] = { {"ARPEGGIATOR", 1, AC_GLOB, TAB_NONE, {G_ARP}, {0},
-    {{P_ARP_MODE, P_ARP_OCT, P_ARP_RATE, P_ARP_GATE}}, "ON / OFF: MODE|MIDI CLOCK: SYNC"} };
+static const item_t IT_ARP[] = { {"ARPEGGIATOR", 2, AC_GLOB, TAB_NONE, {G_ARP, G_ARP}, {0, 0},   /* (0.6, the user: its
+                                                 * switch first, GATE on a second page) */
+    {{P_ARP_ON, P_ARP_MODE, P_ARP_OCT, P_ARP_RATE}, {P_ARP_GATE, NONE, NONE, NONE}}, "ON / OFF: KNOB 1|MIDI CLOCK: SYNC"} };
 enum { S_HOME, S_EDIT, S_ENV, S_LFO, S_FX, S_PATCH, S_ARP, S_VCF, S_UTL, NSEC };
 typedef struct { const item_t *it; uint8_t n, btn; } section_t;
 static const section_t SEC[NSEC] = {
-    {IT_HOME, 3, BTN_HOME}, {IT_EDIT, 1, BTN_EDIT}, {IT_ENV, 2, BTN_ENV}, {IT_LFO, 1, BTN_LFO}, {IT_FX, 3, BTN_FX},
+    {IT_HOME, 4, BTN_HOME}, {IT_EDIT, 1, BTN_EDIT}, {IT_ENV, 2, BTN_ENV}, {IT_LFO, 1, BTN_LFO}, {IT_FX, 3, BTN_FX},
     {IT_PATCH, 2, BTN_SEQ}, {IT_ARP, 1, BTN_ARP}, {IT_VCF, 1, BTN_GLO}, {IT_UTL, 2, BTN_SEL},
 };
 static uint32_t sec = S_HOME, sec_item[NSEC], item_pg[NSEC][8];
@@ -280,6 +306,9 @@ static uint32_t pmax(int32_t id)
     case V_TEMPO: return 200;
     case V_LIGHTS: return 10;
     case V_CLKSRC: return CLK_TRS;
+    case V_VOVOL: return 10;
+    case V_VOSPD: return VO_NRATE - 1u;
+    case V_VOPITCH: return VO_NPITCH - 1u;
     default:
         if (id >= V_PAN1 && id < V_PAN1 + 4) return 128;
         return 127;
@@ -297,6 +326,9 @@ static int32_t pget(int32_t id)
     case V_KVEL: return set.kvel;
     case V_LIGHTS: return (int32_t)lights_level();
     case V_CLKSRC: return set.clk_src;
+    case V_VOVOL: return set.vo_vol;
+    case V_VOSPD: return set.vo_speed;
+    case V_VOPITCH: return set.vo_pitch;
     default:
         if (id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK) return set.lvl[id - V_LVL1];
         if (id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK) return set.pan[id - V_PAN1] + 64;
@@ -325,7 +357,7 @@ static void pset_t(uint32_t t, int32_t id, int32_t v)   /* track t's sound, or a
         }
         if (t % NTRK == ctrk) {
             if (PDEF[id].max < 24u) dirty_page = 1;   /* (a switch, a jack: the page's values may follow it) */
-            if (id == P_VCA_MODE || id == P_ARP_MODE || is_jack(id) || id == P_FOLD) dirty_hdr = 1;   /* (the tags) */
+            if (id == P_VCA_MODE || id == P_ARP_ON || is_jack(id) || id == P_FOLD) dirty_hdr = 1;   /* (the tags) */
             dirty_map = dirty_graph = 1;
         }
         return;
@@ -337,6 +369,9 @@ static void pset_t(uint32_t t, int32_t id, int32_t v)   /* track t's sound, or a
     case V_KVEL: set.kvel = (uint8_t)(v ? v : 1); break;
     case V_LIGHTS: set.lights = (uint8_t)(v + 1); lights_apply(); break;
     case V_CLKSRC: clock_src_set((uint32_t)v); break;
+    case V_VOVOL: set.vo_vol = (uint8_t)v; break;
+    case V_VOSPD: set.vo_speed = (uint8_t)v; vo_settings(set.vo_speed, set.vo_pitch); break;
+    case V_VOPITCH: set.vo_pitch = (uint8_t)v; vo_settings(set.vo_speed, set.vo_pitch); break;
     default:
         if (id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK) { set.lvl[id - V_LVL1] = (uint8_t)v; ctl_lvl[id - V_LVL1] = (uint8_t)v; break; }
         if (id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK) { set.pan[id - V_PAN1] = (int8_t)(v - 64); ctl_pan[id - V_PAN1] = (int8_t)(v - 64); break; }
@@ -356,6 +391,9 @@ static const char *plabel(int32_t id)
     case V_KVEL: return "KEY VEL";
     case V_LIGHTS: return "LIGHTS";
     case V_CLKSRC: return "CLOCK";
+    case V_VOVOL: return "VOLUME";
+    case V_VOSPD: return "SPEED";
+    case V_VOPITCH: return "PITCH";
     default:
         if (id >= V_LVL1 && id < V_LVL1 + 4) return NTRK > 1u ? LVL[id - V_LVL1] : "LEVEL";
         return NTRK > 1u ? PAN[(id - V_PAN1) & 3] : "PAN";
@@ -448,6 +486,8 @@ static void param_value(char *s, int32_t id, int32_t v)   /* <= 8 characters */
             }
             fmt_u(s, (uint32_t)v + 40u); return;
         case V_CLKSRC: scat(s, CLK_NAME[(uint32_t)v % 3u]); return;
+        case V_VOSPD: fmt_u(s, (uint32_t)v + 1u); return;   /* (0.6) 1 slowest .. 9 fastest */
+        case V_VOPITCH: fmt_u(s, VO_PITCH_HZ[(uint32_t)v % VO_NPITCH]); scat(s, "Hz"); return;
         default:
             if (id >= V_PAN1 && id < V_PAN1 + 4) {
                 if (v == 64) scat(s, "C"); else { scat(s, v < 64 ? "L" : "R"); fmt_u(s + 1, (uint32_t)(v < 64 ? 64 - v : v - 64)); }
@@ -492,7 +532,7 @@ static void param_value(char *s, int32_t id, int32_t v)   /* <= 8 characters */
     case K_PRIO: scat(s, PRIO_NAME[v % NPR]); break;
     case K_RETRIG: scat(s, v ? "ALWAYS" : "LEGATO"); break;
     case K_BEND: fmt_u(s, (uint32_t)v); scat(s, " st"); break;
-    case K_ARP: scat(s, ARP_NAME[v % NAR]); break;
+    case K_ARP: scat(s, ARP_NAME[AR_UP + (uint32_t)v % (NAR - 1u)]); break;
     case K_AOCT: fmt_u(s, (uint32_t)v + 1u); break;
     case K_ADIV: scat(s, DIV_NAME[ARP_DIV0 + (uint32_t)v % NARPDIV]); break;
     case K_SYNC: scat(s, v ? DIV_NAME[((uint32_t)v - 1u) % NCLKDIV] : "FREE"); break;
@@ -597,13 +637,16 @@ static void mutate_patch(void)                  /* a variation: the continuous k
 /* ---- the keys: notes, or (SAVE held) functions on the white keys */
 static const int8_t KEY_WHITE[27] = {0, -1, 1, -1, 2, -1, 3, 4, -1, 5, -1, 6, 7, -1, 8, -1, 9, -1, 10, 11, -1, 12, -1, 13, 14, -1, 15};
 static uint32_t layer_btn, layer_used;          /* a held button whose keys are functions: BTN_SAVE (else 0xFF) */
+#define SAVE_HINT "F3 INIT  G3 RANDOM|A3 MUTATE  G5 RESET"
+static uint32_t save_hint_t;                    /* (0.6) SAVE pressed then: held 0.6 s, its keys' hint is said */
 static uint32_t reset_armed, reset_t;           /* (0.5) GLO + G5: the memory's reset waits for OCT+ */
 static void memory_reset(void);
 static uint32_t edit_used;                      /* EDIT: used as a modifier (undo / redo) since pressed */
 /* (0.5.2, the user) REC: a tap (let go within REC_HOLD_MS) turns every effect off / on; held longer, every
  * parameter on the screen shows its MIDI CC instead of its value (cc_view), the effects untouched */
 #define REC_HOLD_MS 500u
-static uint32_t rec_down, rec_t, cc_view;
+static uint32_t rec_down, rec_t, cc_view, rec_used;   /* (rec_used: a knob turned) */
+static uint32_t play_down, play_t, play_used;   /* (0.6) PLAY: a tap HOLD, held 2 s the voice (voice_toggle) */
 static uint32_t keys_prev;
 static uint8_t key_note[27], key_fn[27], key_trk[27];
 
@@ -813,8 +856,8 @@ static const char *tab_text(const item_t *it)   /* the box's tab: the module, as
     if (sec == S_ARP) return "ARP";
     if (sec == S_UTL) return "KB";              /* (0.5.1: KEYBOARD, SELECT's second item) */
     {                                           /* (HOME's items, 0.5) */
-        static const char *const HT[3] = {"MIX", "VOICE", "GLO"};
-        return HT[sec_item[S_HOME] % 3u];
+        static const char *const HT[4] = {"MIX", "VOICE", "GLO", "READ"};
+        return HT[sec_item[S_HOME] % 4u];
     }
 }
 
@@ -849,7 +892,7 @@ static void draw_header(void)                   /* the top strip and the program
         if (live.v[P_DL_ON]) scat(tags, " DLY");
         if (live.v[P_RV_ON]) scat(tags, " REV");
     }
-    if (live.v[P_ARP_MODE]) scat(tags, "  ARP");
+    if (live.v[P_ARP_ON]) scat(tags, "  ARP");
     if (ctl_hold >> t & 1u) scat(tags, "  HOLD");
     if (set.oct && slen(tags) < 34u) { scat(tags, "  OCT"); fmt_s(tags + slen(tags), set.oct); }
     draw_top();
@@ -865,9 +908,9 @@ static void cc_text(knob_view_t *kv, int32_t id)   /* (0.5.2) REC held: "CC 74" 
 {
     uint32_t cc = id >= 0 && id < NPARAM ? cc_of[id] : id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK ? 7u
         : id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK ? 10u : 0u;
-    kv->value[0] = 0;
-    if (cc) { scat(kv->value, "CC "); fmt_u(kv->value + 3, cc); kv->badge = 1; }
-    else scat(kv->value, "NO CC");
+    kv->cc[0] = 0;                              /* (0.6: the badge's; the value stays) */
+    if (cc) { scat(kv->cc, "CC "); fmt_u(kv->cc + 3, cc); kv->badge = 1; }
+    else { scat(kv->cc, "NO CC"); kv->badge = 2; }
 }
 static void knob_view(knob_view_t *kv, uint32_t k)
 {
@@ -913,6 +956,23 @@ static void page_map(pmap_t *pm)
     for (k = 0; k < pm->n; k++) pm->npg[k] = item_of(sec, k)->npg;
     pm->item = (uint8_t)(sec_item[sec] % SEC[sec].n); pm->pg = (uint8_t)cur_pg();
 }
+static const char *page_sub(void)               /* the page's subtitle (drawn, and said: mfm_speak.h) */
+{
+    const char *sub = cur_item()->sub[cur_pg() % 5u];
+    if (sec == S_ENV && sec_item[S_ENV] % 2u == 1u) sub = live.v[P_VCA_MODE] ? "MODE ON" : "MODE EG";
+    if (sec == S_FX) {                          /* the effect's ON, and REC's */
+        static const uint8_t ON[3] = {P_DL_ON, P_RV_ON, P_CH_ON};   /* (IT_FX's order) */
+        sub = set.fx_off ? "OFF (REC)" : live.v[ON[sec_item[S_FX] % 3u]] ? "ON" : "OFF";
+    }
+    if (sec == S_LFO && live.v[P_LFO_SYNC]) {   /* (0.4.1) SYNC on: the clock's source and its state */
+        static const char *const RUN[3] = {"TEMPO", "USB CLOCK", "TRS CLOCK"}, *const STOP[3] = {"TEMPO", "USB (STOPPED)", "TRS (STOPPED)"},
+            *const NO[3] = {"TEMPO", "USB: NO CLOCK", "TRS: NO CLOCK"};
+        uint32_t c = set.clk_src % 3u;
+        sub = ctl_clk_run ? RUN[c] : ctl_ext_quarter ? STOP[c] : NO[c];
+    }
+    if (sec == S_ARP) sub = live.v[P_ARP_ON] ? ARP_NAME[AR_UP + live.v[P_ARP_MODE] % (NAR - 1u)] : "OFF";
+    return sub;
+}
 static void draw_patchbay(void)
 {
     const item_t *it = cur_item();
@@ -926,7 +986,7 @@ static void draw_page(void)
     knob_view_t kv[4];
     pmap_t pm;
     char note[16];
-    const char *sub = it->sub[cur_pg() % 5u];
+    const char *sub = page_sub();
     uint32_t k;
     if (on_patchbay()) { draw_patchbay(); return; }
     note[0] = 0;
@@ -934,18 +994,6 @@ static void draw_page(void)
         if (cpu_m.over) { scat(note, "LATE "); fmt_u(note + 5, cpu_m.over); }
         else { fmt_u(note, cpu_m.peak); scat(note, " us"); }
     }
-    if (sec == S_ENV && sec_item[S_ENV] % 2u == 1u) sub = live.v[P_VCA_MODE] ? "MODE ON" : "MODE EG";
-    if (sec == S_FX) {                          /* the effect's ON, and REC's */
-        static const uint8_t ON[3] = {P_DL_ON, P_RV_ON, P_CH_ON};   /* (IT_FX's order) */
-        sub = set.fx_off ? "OFF (REC)" : live.v[ON[sec_item[S_FX] % 3u]] ? "ON" : "OFF";
-    }
-    if (sec == S_LFO && live.v[P_LFO_SYNC]) {   /* (0.4.1) SYNC on: the clock's source and its state */
-        static const char *const RUN[3] = {"TEMPO", "USB CLOCK", "TRS CLOCK"}, *const STOP[3] = {"TEMPO", "USB (STOPPED)", "TRS (STOPPED)"},
-            *const NO[3] = {"TEMPO", "USB: NO CLOCK", "TRS: NO CLOCK"};
-        uint32_t c = set.clk_src % 3u;
-        sub = ctl_clk_run ? RUN[c] : ctl_ext_quarter ? STOP[c] : NO[c];
-    }
-    if (sec == S_ARP) sub = ARP_NAME[live.v[P_ARP_MODE] % NAR];
     for (k = 0; k < 4u; k++) knob_view(&kv[k], k);
     page_map(&pm);
     ui_page(tab_text(it), it->title, sub, &pm, note[0] ? note : 0, kv, acc_colour(it));
@@ -983,6 +1031,7 @@ static void draw_graph(void)                    /* the page's picture, from the 
     case G_DLY: g_dly(live.v, c); break;
     case G_REV: g_rev(live.v, c); break;
     case G_TRACKS: g_tracks(ctrk); break;
+    case G_READ: g_read(); break;
     case G_PATCH: {                             /* an INPUTS page: its four inputs and their cables */
         int16_t jp[4];
         uint32_t k;
@@ -1060,6 +1109,7 @@ static void go_section(uint32_t s)              /* a section's button: its first
                                                  * page, the last one followed by the first */
 {
     uint32_t i;
+    sp_reread = 1;                              /* (0.6, the user: a button says its page, again on a one-page one) */
     if (sec == s) { page_step(1, 1); return; }
     sec = s;
     sec_item[s] = 0;
@@ -1084,6 +1134,17 @@ static void page_step(int32_t e, int wrap)      /* the next / previous page of t
     dirty_page = dirty_map = 1;
     if (i != was) dirty_hdr = 1;                /* (the module's tab and its colour) */
 }
+static const struct { uint8_t btn, sec; } SECB[] = {{BTN_HOME, S_HOME}, {BTN_EDIT, S_EDIT}, {BTN_ENV, S_ENV},
+    {BTN_LFO, S_LFO}, {BTN_FX, S_FX}, {BTN_SEQ, S_PATCH}, {BTN_GLO, S_VCF}, {BTN_ARP, S_ARP}, {BTN_SEL, S_UTL}};
+#define NSECB (sizeof SECB / sizeof SECB[0])
+static uint32_t secb_btn = 0xFFu, secb_t, secb_used;   /* (0.6) the section's button held, since when, used */
+static void secb_hold(uint32_t bb)              /* (0.6, the user) held: its page (there if elsewhere) with values */
+{
+    uint32_t i;
+    for (i = 0; i < NSECB; i++)
+        if (SECB[i].btn == bb && sec != SECB[i].sec) go_section(SECB[i].sec);
+    sp_values = 1;
+}
 static void buttons(void)
 {
     uint32_t rel, b = fm1_input_edges(&rel);
@@ -1091,14 +1152,15 @@ static void buttons(void)
     if (reset_armed && b) {                     /* (0.5) the memory's reset: OCT+ only confirms, any other cancels */
         reset_armed = 0; dirty_hdr = 1;
         if (b >> BTN_OCT_UP & 1u) { memory_reset(); return; }
-        say("RESET CANCELLED");
+        warn("RESET CANCELLED");
         return;                                 /* (the press only cancels: no octave, no page) */
     }
-    if (save_armed && (b & ~(1u << BTN_SAVE))) { save_armed = 0; dirty_hdr = 1; say("SAVE CANCELLED"); }
+    if (save_armed && (b & ~(1u << BTN_SAVE))) { save_armed = 0; dirty_hdr = 1; warn("SAVE CANCELLED"); }
     /* tap / hold: EDIT (held: OCT- / OCT+ undo / redo), SAVE (held: white keys = INIT, RANDOM, MUTATE) */
     if (b >> BTN_EDIT & 1u) edit_used = 0;      /* (EDIT held keeps the keys as notes) */
-    if (rel >> BTN_EDIT & 1u && !edit_used) go_section(S_EDIT);   /* (0.5: however long it was held) */
-    if (b >> BTN_SAVE & 1u) { layer_btn = BTN_SAVE; layer_used = 0; say("F3 INIT  G3 RANDOM|A3 MUTATE  G5 RESET"); }
+    if (b >> BTN_SAVE & 1u) {                   /* (0.6: the keys' hint said only if SAVE is held: save_hint_t) */
+        layer_btn = BTN_SAVE; layer_used = 0; save_hint_t = fm1_ms; show(SAVE_HINT);
+    }
     if (rel >> BTN_SAVE & 1u && layer_btn == BTN_SAVE) {
         int tap = !layer_used;                  /* (0.5: however long it was held, if no key was used) */
         layer_btn = 0xFFu;
@@ -1111,7 +1173,11 @@ static void buttons(void)
                 if (u != ctrk && set.tprog[u] == save_to % NPROG && !edited[u]) live_p[u] = live;
             set_dirty = 1; set_t = fm1_ms;
             say("SAVED|(WRITTEN WHEN SILENT)");
-        } else if (tap) { save_armed = 1; save_t = fm1_ms; save_to = set.tprog[ctrk]; say("PRESETS: THE SLOT|SAVE AGAIN: SAVE"); }
+        } else if (tap) {
+            save_armed = 1; save_t = fm1_ms; save_to = set.tprog[ctrk];
+            say_as("PRESETS: THE SLOT|SAVE AGAIN: SAVE",   /* (0.6, the user's words) */
+                   "SAVE PRESET, ROTATE THE PRESET KNOB FOR SELECT THE SLOT, SAVE AGAIN FOR CONFIRM");
+        }
         dirty_hdr = dirty_map = 1;
     }
     if (b & (3u << BTN_OCT_DOWN)) {
@@ -1122,38 +1188,51 @@ static void buttons(void)
                 live_p[undo_trk % NTRK] = undo_p; undo_p = t; mark_edited_t(undo_trk);
                 dirty_hdr = dirty_page = dirty_map = dirty_graph = 1; say(b & (1u << BTN_OCT_DOWN) ? "UNDO" : "REDO");
             }
-            else say("NOTHING TO UNDO");
+            else warn("NOTHING TO UNDO");
         } else if ((fm1_in.buttons & (3u << BTN_OCT_DOWN)) == (3u << BTN_OCT_DOWN)) {
-            set.oct = 0; set_dirty = 1; set_t = fm1_ms; say("OCTAVE 0"); dirty_hdr = 1;
+            set.oct = 0; set_dirty = 1; set_t = fm1_ms; show("OCTAVE 0"); dirty_hdr = 1;   /* (0.6, the user: not said) */
         } else {
             if (b & (1u << BTN_OCT_DOWN) && set.oct > -3) set.oct--;
             if (b & (1u << BTN_OCT_UP) && set.oct < 3) set.oct++;
             set_dirty = 1; set_t = fm1_ms; dirty_hdr = 1;
         }
     }
-    if (b & (1u << BTN_HOME)) go_section(S_HOME);
-    if (b & (1u << BTN_ENV)) go_section(S_ENV);
-    if (b & (1u << BTN_LFO)) go_section(S_LFO);
-    if (b & (1u << BTN_FX)) go_section(S_FX);
-    if (b & (1u << BTN_SEQ)) go_section(S_PATCH);
-    if (b & (1u << BTN_GLO)) go_section(S_VCF); /* (0.5, the user: GLO opens the VCF; its reset is SAVE + G5) */
-    if (b & (1u << BTN_ARP)) go_section(S_ARP);  /* ARP: its page (0.5, the user: pressed again it no longer turns the
-                                                 * arp on / off; its MODE knob does, OFF or a mode) */
-    if (b & (1u << BTN_SEL)) go_section(S_UTL);  /* (0.3: SELECT pressed: UTL; turned: the pages) */
-    if (b & (1u << BTN_PLAY)) {                 /* PLAY: HOLD (the notes stay until the next chord), the panel's track */
-        ctl_hold ^= 1u << ctrk;
-        say(ctl_hold >> ctrk & 1u ? "HOLD ON" : "HOLD OFF");
-        dirty_hdr = 1;
+    {                                           /* (0.6, the user) a section's button: tapped, its page (on the
+                                                 * release, however long, as EDIT's); held as long as REC for its CCs (REC_HOLD_MS, the
+                                                 * user), the page said with
+                                                 * its knobs' values (app_main: secb_hold). GLO opens the VCF (0.5),
+                                                 * SEQ the patchbay, SELECT pressed UTL; EDIT + OCT is undo */
+        uint32_t i;
+        for (i = 0; i < NSECB; i++) {
+            uint32_t bb = SECB[i].btn;
+            if (b >> bb & 1u) { secb_btn = bb; secb_t = fm1_ms; secb_used = 0; }
+            if (rel >> bb & 1u && secb_btn == bb) {
+                secb_btn = 0xFFu;
+                if (!secb_used && !(bb == BTN_EDIT && edit_used)) go_section(SECB[i].sec);
+            }
+        }
     }
-    if (b & (1u << BTN_REC)) { rec_down = 1; rec_t = fm1_ms; }   /* (0.5.2: held, the CCs: app_main) */
+    if (b & (1u << BTN_PLAY)) { play_down = 1; play_used = 0; play_t = fm1_ms; }   /* (0.6: held 2 s, the voice: app_main) */
+    if (rel >> BTN_PLAY & 1u && play_down) {    /* PLAY tapped: HOLD (the notes stay until the next chord), the panel's
+                                                 * track (0.6: on the release, under 2 s) */
+        play_down = 0;
+        if (!play_used) {
+            ctl_hold ^= 1u << ctrk;
+            say(ctl_hold >> ctrk & 1u ? "KEYBOARD HOLD ON" : "KEYBOARD HOLD OFF");   /* (0.6, the user) */
+            dirty_hdr = 1;
+        }
+    }
+    if (b & (1u << BTN_REC)) { rec_down = 1; rec_used = 0; rec_t = fm1_ms; }   /* (0.5.2: held, the CCs: app_main) */
     if (rel >> BTN_REC & 1u && rec_down) {
         rec_down = 0;
-        if (cc_view || fm1_ms - rec_t >= REC_HOLD_MS) { cc_view = 0; dirty_page = 1; }   /* (held: the values
+        if (cc_view || rec_used || fm1_ms - rec_t >= REC_HOLD_MS) { cc_view = 0; dirty_page = 1; }   /* (held: the values
                                                  * again, the effects as they were) */
         else {                                  /* REC tapped (0.3, the user): every effect off / on again, as
                                                  * they were (0.5.2: on the release) */
             set.fx_off ^= 1u; ctl_fx_off = set.fx_off; set_dirty = 1; set_t = fm1_ms;
-            say(set.fx_off ? "EFFECTS OFF|REC: ON AGAIN" : "EFFECTS ON|AS THEY WERE");
+            if (set.fx_off) say_as("EFFECTS ENGINE OFF", "EFFECTS. ENGINE OFF");   /* (0.6, the user: the stop said,
+                                                 * not shown) */
+            else say_as("EFFECTS ENGINE ON", "EFFECTS. ENGINE ON");
             dirty_hdr = 1;
             if (sec == S_FX) dirty_page = dirty_graph = 1;
         }
@@ -1196,15 +1275,28 @@ static void trk_select(uint32_t t)              /* ALGORITHM (several tracks): t
     say(toast_buf);
     dirty_hdr = dirty_page = dirty_map = dirty_graph = 1;
 }
-static void encoders(void)
+static void sp_knob_change(int32_t id, int32_t was, uint32_t fresh);   /* (mfm_speak.h) */
+static void sp_hush(void);
+static void sp_knob_touch(uint32_t k, int32_t id);
+static uint32_t sp_turn_t, sp_in_enc;           /* (0.6) mfm_speak.h: an encoder turned last then; turning now */
+static void encoders_(void);
+static void encoders(void)                      /* (0.6: what a turn makes the screen say waits until it stops) */
+{
+    sp_in_enc = 1;
+    encoders_();
+    sp_in_enc = 0;
+}
+static void encoders_(void)
 {
     int32_t e;
     uint32_t k;
     if ((e = fm1_enc_take(ENC_PRESETS)) != 0) {
+        sp_turn_t = fm1_ms;
         if (save_armed) { save_to = (save_to + NPROG * 4u + (uint32_t)e) % NPROG; save_t = fm1_ms; dirty_hdr = 1; }
         else trk_load(ctrk, (set.tprog[ctrk] + NPROG * 4u + (uint32_t)(enc_step(6, e, NPROG) % (int32_t)NPROG + (int32_t)NPROG)) % NPROG);
     }
     if ((e = fm1_enc_take(ENC_ALGORITHM)) != 0) {
+        sp_turn_t = fm1_ms;
         if (NTRK > 1u)                          /* ALGORITHM: the track, one a detent */
             trk_select((uint32_t)clampi((int32_t)ctrk + (e > 0 ? 1 : -1), 0, (int32_t)NTRK - 1));
         else {                                  /* (one track: the filter's CUTOFF, always at hand) */
@@ -1219,23 +1311,57 @@ static void encoders(void)
             }
         }
     }
-    if ((e = fm1_enc_take(ENC_SELECT)) != 0) page_step(e, 0);  /* SELECT: every page of the section, stopping at the ends */
+    if ((e = fm1_enc_take(ENC_SELECT)) != 0) { sp_turn_t = fm1_ms; page_step(e, 0); }  /* SELECT: every page of the section, stopping at the ends */
     for (k = 0; k < 4u; k++)
         if ((e = fm1_enc_take(ENC_KNOB1 + k)) != 0) {
             int32_t id = page_param(k);
+            uint32_t fresh = fm1_ms - sp_turn_t >= 500u;   /* (a new turn, not the same one going on) */
+            sp_turn_t = fm1_ms;
+            if (fresh) sp_hush();                /* (0.6, the user: a knob turned, the page's reading stops) */
             if (id < 0) continue;
+            sp_knob_touch(k, id);               /* (0.6, the user: the first on the page, or another: its name) */
             if (id == V_TEMPO && set.clk_src != CLK_INT) {   /* (0.4.1) locked: the outside clock sets it */
-                say(set.clk_src == CLK_USB ? "TEMPO: USB CLOCK" : "TEMPO: TRS CLOCK");
+                warn(set.clk_src == CLK_USB ? "TEMPO NOT CHANGED|THE USB CLOCK SETS IT" : "TEMPO NOT CHANGED|THE TRS CLOCK SETS IT");
                 continue;
             }
             if (is_jack(id)) {                  /* (never its own module's output); the cable swings in */
                 int32_t was = pget(id);
                 pset(id, jack_step(id, was, e));
                 if (pget(id) != was) cable_swing((uint32_t)(id - P_JACK));
-            } else pset(id, pget(id) + enc_step(2u + k, e, pmax(id)));
+                sp_knob_change(id, was, fresh);  /* (0.6, the user: a cable said as it changes) */
+            } else {
+                int32_t was = pget(id);
+                pset(id, was + enc_step(2u + k, e, pmax(id)));
+                sp_knob_change(id, was, fresh);  /* (0.6, the user: few values, each; else an end, at once) */
+            }
+            if (rec_down) { rec_used = 1; sp_turn_rec = 1; }   /* (0.6, the user: turned with REC held: said) */
             dirty_knob |= 1u << k;
             an_knob[k] = 256; an_focus = (int32_t)k; an_focus_t = knob_t = fm1_ms;   /* (lit while turned) */
         }
+}
+
+#include "mfm_speak.h"                          /* (0.6) what a screen reader is told */
+/* (0.6, the user) PLAY held 2 s: the FM-1's own voice on / off, said ("SCREEN READER ON": then the page), kept with
+ * the settings */
+static void voice_toggle(void)
+{
+    if (set.voice) { say("SCREEN READER OFF"); set.voice = 0; }
+    else { set.voice = 1; say("SCREEN READER ON"); sp.started = 0; sp.where_soft = 1; }
+    set_dirty = 1; set_t = fm1_ms;
+}
+/* (0.6) the voice's VOLUME (HOME > READER, 0..10: 8 the level it had) on the MASTER knob's, Q12 */
+static int32_t vo_level(int32_t master) { return master * (int32_t)set.vo_vol / 8; }
+static void app_audio_out(int32_t *o, uint32_t n)   /* (0.6) after USB audio's copy (platform.c): what only the
+                                                 * outputs hear, the voice at the MASTER knob's level */
+{
+#ifdef OBV_HOST
+    vo_mix(o, n, vo_level(4096));
+#else
+    uint32_t t0 = fm1_ticks();
+    vo_mix(o, n, vo_level(master_q12));
+    ui_render_us += (fm1_ticks() - t0) / FM1_TICKS_PER_US;   /* (the CPU meter: the engine and the voice) */
+    cpu_meter_add(&cpu_m, ui_render_us, fm1_ms);
+#endif
 }
 
 /* (0.5, the user) HOLD lights PLAY green. The FM-1's PLAY has a green LED besides its own red one: column 8, row PA5
@@ -1266,7 +1392,7 @@ static void leds(void)
             on |= 1u << (set.oct < 0 ? BTN_OCT_DOWN : BTN_OCT_UP);
     }
     if (hold && HOLD_ON_OWN_LED) on |= 1u << BTN_PLAY;   /* (0.5, the user: HOLD green: on the FM-1 its green LED, below) */
-    if (live.v[P_ARP_MODE]) on |= 1u << BTN_ARP;
+    if (live.v[P_ARP_ON]) on |= 1u << BTN_ARP;
     if (save_armed && (fm1_ms / 250u & 1u)) on |= 1u << BTN_SAVE;
     if (n >= 0 && n < 27) keys = 1u << n;
     if (layer_btn == BTN_SAVE)                  /* (0.3.1) SAVE held: F3 INIT, G3 RANDOM, A3 MUTATE lit; (0.5) G5 the reset */
@@ -1304,6 +1430,7 @@ static void settings_fix(void)
 {
     uint32_t i;
     if (set.trk >= NTRK) set.trk = 0;
+    if (set.voice > 1u) set.voice = 0;
     for (i = 0; i < NTRK; i++) {
         if (set.tprog[i] >= NPROG) set.tprog[i] = 0;
         if (set.lvl[i] > 127u) set.lvl[i] = 100;
@@ -1316,6 +1443,11 @@ static void settings_fix(void)
     if (set.tune < -50 || set.tune > 50) set.tune = 0;
     if (!set.kvel || set.kvel > 127u) set.kvel = 100;
     if (set.lights > 11u) set.lights = 0;
+    if (set.vo_set != 2u || set.vo_vol > 10u || set.vo_speed >= VO_NRATE || set.vo_pitch >= VO_NPITCH) {   /* (0.6) the
+                                                 * voice's (vo_set 2: SPEED 1..9, the user; 4 at first: 130 %) */
+        set.vo_set = 2; set.vo_vol = 8; set.vo_speed = 3; set.vo_pitch = 3;
+    }
+    vo_settings(set.vo_speed, set.vo_pitch);
     set.fx_off = set.fx_off ? 1u : 0u;
     if (set.clk_src > CLK_TRS) set.clk_src = CLK_INT;
     ctl_clk_ext = set.clk_src != CLK_INT;
@@ -1374,6 +1506,7 @@ static void app_main(void)
     atexit(host_blocks_report);
 #endif
     engine_init();
+    vo_init();
     cc_map_init();
     for (i = 0; i < NPSECT; i++)
         if (psect_load(i, &psect[i], sizeof psect[i])
@@ -1400,7 +1533,7 @@ static void app_main(void)
                 }
             psect[i].tag = PS_TAG;
         }
-    if ((settings_load(&set, sizeof set) && settings_load(&set, SET_SIZE_02)) || set.magic != SET_MAGIC
+    if ((settings_load(&set, sizeof set) && settings_load(&set, SET_SIZE_05) && settings_load(&set, SET_SIZE_02)) || set.magic != SET_MAGIC
         || set.version != SET_VERSION)
         settings_defaults();
     for (i = 0; i < NTRK; i++) nrpn_msb[i] = nrpn_lsb[i] = 127;
@@ -1416,14 +1549,29 @@ static void app_main(void)
         keys_in(0);
         midi_in(0);
         buttons();
-        if (rec_down && !cc_view && fm1_ms - rec_t >= REC_HOLD_MS) { cc_view = 1; dirty_page = 1; }   /* (0.5.2) REC held */
+        if (rec_down && !cc_view && fm1_ms - rec_t >= REC_HOLD_MS) {   /* (0.5.2) REC held: the CCs shown */
+            cc_view = 1; dirty_page = 1;
+            sp_tell("TURN A KNOB TO KNOW ITS VALUE");   /* (0.6, the user: said, not shown) */
+        }
+        if (play_down && !play_used && fm1_ms - play_t >= 2000u) { play_used = 1; voice_toggle(); }   /* (0.6) */
+        if (secb_btn != 0xFFu && !secb_used && fm1_ms - secb_t >= REC_HOLD_MS && !(secb_btn == BTN_EDIT && edit_used)) {
+            secb_used = 1; secb_hold(secb_btn);   /* (0.6) a section's button held (as REC, 0.5 s) */
+        }
+        if (save_hint_t && layer_btn == BTN_SAVE && !layer_used && fm1_ms - save_hint_t >= 600u) {   /* (0.6) SAVE
+                                                 * held, no key yet: its keys said (a tap says what it does) */
+            save_hint_t = 0;
+            ann_toast(SAVE_HINT, ANN_NOW);
+        }
+        if (layer_btn != BTN_SAVE) save_hint_t = 0;
         encoders();
-        if (save_armed && fm1_ms - save_t > 8000u) { save_armed = 0; dirty_hdr = 1; say("SAVE CANCELLED"); }
-        if (reset_armed && fm1_ms - reset_t > 8000u) { reset_armed = 0; dirty_hdr = 1; say("RESET CANCELLED"); }
+        if (save_armed && fm1_ms - save_t > 8000u) { save_armed = 0; dirty_hdr = 1; warn("SAVE CANCELLED"); }
+        if (reset_armed && fm1_ms - reset_t > 8000u) { reset_armed = 0; dirty_hdr = 1; warn("RESET CANCELLED"); }
         if (diag_req) { diag_req = 0; diag_send(); }
         if (ctl_clk_run && fm1_ms - clk_last > 300u) { ctl_clk_run = 0; if (sec == S_LFO) dirty_page = 1; }   /* (no clock) */
         saves();
         leds();
+        speak();                                /* (0.6) a screen reader: what changed (mfm_speak.h) */
+        ann_tick(fm1_ms);
         if (dirty_hdr) { dirty_hdr = 0; draw_header(); }
         if (dirty_page && fm1_ms - t_page >= 30u) {
             dirty_page = 0; dirty_knob = 0; t_page = fm1_ms; draw_page(); dirty_graph = 1;

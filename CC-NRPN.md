@@ -78,6 +78,7 @@ Sull'FM-1, **tenendo premuto REC** (mezzo secondo) ogni manopola sullo schermo m
 | 86 | 69 | NOISE: il rumore bianco nel VCF * |
 | 87 | 70 | VCF CUTOFF FINE (64 = 0, +-2 semitoni) * |
 | 88 | 71 | LFO RATE FINE (64 = 0, +-2 semitoni) * |
+| 89 | 72 | ARP ON / OFF * |
 
 ## I cavi via MIDI
 

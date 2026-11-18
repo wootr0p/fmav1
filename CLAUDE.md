@@ -102,6 +102,59 @@ folds at 5 / 15 / 25 V, rounded peaks, 2x oversampled).
 - `mfm_ui.h`: `ui_top`, `ui_prog`, `ui_box`, `ui_knob_at`, `ui_keys`, `ui_toast`, `ui_splash`. Canvas 240 x 192.
 - `mfm_graph.h`: the graphs (`G_*`), `ui_patchbay` (`PB[7][3]`, SEQ's first page), `g_jacks` (an INPUTS page),
   `g_clk` (the clock).
+- `mfm_speak.h` (0.6): what a screen reader is told (fm1-reader, issue #1): `speak()` once a loop notes what changed
+  (the page `sp_ctx`, the knob turned last `knob_t` / `an_focus`, the program, the save slot) and says it only once
+  no encoder has turned for SP_SETTLE_MS = 500 (the user: "mentre lo sto cambiando non leggere il valore";
+  encoders() sets `sp_turn_t`, and a message said during a turn, the track or TEMPO locked, waits in `sp_msg`). A new
+  page (the user): `sp_title` (with its subtitle and, the user, first its place among all its button's pages: "1 OF 7. DELAY OFF", FX's
+  REVERB "4 OF 7"; a button with one page: the title alone), then a message of its own (a longer pause)
+  `sp_knobs(0)`: the names only, a switch (K_ONOFF, VCA MODE) as "DELAY SWITCH"; WHERE too (the user: no values at
+  the start). Every message goes through `sp_out()`: SP_WORDS says the short words in full (the user's list: TIME L
+  "TIME LEFT", EG "ENVELOPE" (the user: one word, as the sections), PRIO "LEGATO PRIORITY", ONE (-5) "ONE NORMALIZED TO MINUS FIVE", ..), so
+  it is right without the words file (which then holds only gen_words.py's common words); the chorus TYPE 1, 2,
+  1 PLUS 2, FREE. REC's toast "EFFECTS ENGINE ON / OFF" (the user). Never the footer's hint (the user). `ann_toast` (from
+  `say()` / `warn()`, warnings ANN_KEEP) joins a two-line message (`sp_line`: "|" a space, a stop or a comma).
+  `sp_knob` says a knob as its page shows it (units apart: "1.2 s", "508 Hz"; a jack the way the cable runs, the
+  user: "LFO TO FOLD IN", "NORMAL VCO TO S+H (VCO)", "NO CABLE TO PWM"; on its page without the title's word). `speak_dump` (host): every page, value, program. The protocol is
+  `firmware/src/announce.c` (fm1-base's, MPL-2.0: never edit the copy; `../fm1-reader/tools/sync_announce.sh .` copies
+  it and `tools/gen_words.py`, `--check` compares), included after platform.c; platform.c's `ann_wire_send` and the
+  frames read before `ota_service`; usb.c SXQ 128 (a whole SAY). The words: `firmware/words.tsv` -> `docs/words/<id>.json`
+  (commit every one, never change or delete one: a device points at it) and `firmware/gen/ann_words.h` (the link,
+  https://wootr0p.github.io/fmav1/words/<id>.json: GitHub Pages from main /docs), by build.py and run_host.sh.
+- `mfm_voice.h` (0.6, the user): the FM-1's own voice, Bigorna's speech.c (Nuno Zimas, GPL-3.0-only) without its
+  screen capture: Klatt formants at 22050 Hz doubled, a phoneme ring (main loop -> audio), `vo_say(text, flags)`
+  (ANN_NOW cuts unless a warning is still being said), `vo_mix` in `app_audio_out` (platform.c calls it after
+  uac_tap: the outputs only; MASTER's level; the music ducked 6 dB) and the CPU meter counts it. Words:
+  `tools/voice_words.txt` (Bigorna's + ours) -> `firmware/gen/voice_dict.h` by `tools/gen_speech.py` (build.py,
+  run_host.sh). ONE text for both ways out: `sp_send(sp_out(), flags)` in mfm_speak.h; sp_out also does what the
+  reader page used to ("1 OF 7", "1 TO 4", "PLUS 1", note values in words, "C C"; SEQ / RESO / REC said in
+  full so the words file's common ones change nothing). `tests/voice_words.sh` (tools/voice_check.py): every word
+  said is in the dictionary, and the page (audit.mjs --spoken) says them word for word. `set.voice` (a spare
+  settings byte), PLAY held 2 s (the user; was 3) (`voice_toggle`; a tap is HOLD on the release). (The user) the page's knobs numbered
+  ("1 CUTOFF, 2 RESONANCE"); SAVE `say_as` (the screen's toast, the user's longer words); its keys' hint said only
+  when SAVE is held 0.6 s (`save_hint_t`); the voice's comma VO_COMMA 170 ms, a stop VO_STOP. (The user, then) a
+  switch said by its whole name (sp_name(id, 0)); effects' titles without ON / OFF; `sp_reread` (go_section) says
+  a one-page section's page again; `sp_cc()`: REC held shows the CCs, but with the voice on it reads the values
+  (sp_knobs(1)), and REC let go says nothing. ARP: `P_ARP_ON` (appended, CC 89, NRPN 72; an old save's 0xFF slot
+  converted in patch_fix_values: MODE 0 = off, else on with MODE - 1), `P_ARP_MODE` AR_UP + v (0..6), GATE on a
+  second ARP page. (The user, round 9) REC held: CC badges over the knobs (`knob_badge`, kv->cc; the patchbay: over
+  the jacks), the value in view, never said; a section's button acts on its release, held REC_HOLD_MS, 0.5 s as REC (`secb_hold`,
+  `sp_values`) its page with values; a knob's value said only when turned with REC held (`sp_turn_rec`, and
+  `rec_used`: no effects toggle), a switch always, HOME > READER's always; an end at once (`sp_knob_end`);
+  after a page is said, what follows queues (`after_page`). HOME > READER: V_VOVOL / V_VOSPD / V_VOPITCH, settings
+  vo_set/vo_vol/vo_speed/vo_pitch (SET_SIZE_05: the older save still loads, vo_set not 2 -> defaults VOLUME 8, SPEED 4 of 1..9
+  (130 %: the user, slower speeds too), 110 Hz). HOME mixer held: PLAYING after a track whose meter shows (g_trk_h).
+  A knob turned (a new turn) stops the page's reading, said or pending (`sp_hush`: a blank NOW SAY to fm1-reader,
+  the voice's ring cut). REC held: `sp_tell("TURN A KNOB TO KNOW ITS VALUE")`. READER's picture G_READ (`g_read`): the
+  big "FOR ACTIVATE THE SCREEN READER, HOLD PLAY/STOP". (The user, then) a page says its title only (held: all its
+  knobs with values; the patchbay's overview: its cables); a knob touched first on the page, or another than the
+  last, says its name at once (`sp_knob_touch`, `sp_touch_k` reset when a page is entered). A knob of few values
+  (`sp_discrete`: a jack, or pmax <= 24) says each value as it changes (`sp_knob_change`; the user: "24 or so"),
+  any other its end with its value at once; FOLD said WAVE FOLD (sp_name). Titles: EDIT "OSCILLATOR", GLO "FILTER", ARP
+  "ARPEGGIATOR", without their subtitles (the user).
+  KEYBOARD HOLD ON / OFF. Cost: ~16 KB flash, 1.2 KB RAM,
+  +122 mean / +141 max instructions a sample on the host while it speaks (the 4-track worst case is 2422: about
+  +5 points on the chip, to be measured there with fm1_cpu.py).
 - `mfm_patches.h`: the 90 programs (1-40 as 0.2; 41-90 levelled by `build/level_new.py`-style passes of
   `tools/level_programs.py`: render, measure, VOLUME x 10^((target - peak) / 40)). `tools/try_patches.py` tries sounds by
   NRPN on the host.
@@ -138,6 +191,10 @@ a core (`sanitize.sh --job`, JOBS=n), the 90 programs in 8 parts each starting o
 before (every program change still played): the whole suite ~2.5 min on 8 cores (it was ~25). Host scripts
 must be in time order and at most ~60 MIDI messages a millisecond; nothing before ~1400 ms (the splash).
 `tests/mfm_screens.txt` makes the manual's screens and the hub's card.
+(0.6) The screen reader: `tests/mfm_sr.txt` (host commands `listen`, `where`, `said TEXT`, `said_none`, `speakdump`;
+FMAV1_SAID_LOG=FILE logs every SAY) and `tests/sr_audit.sh` (fm1-reader's `tools/audit.mjs` on the dump and the
+messages; needs ../fm1-reader, Node.js, here Windows' from WSL, copied to %TEMP%, and an English word list, else
+the step says SKIPPED). `sh tests/sr_audit.sh --spoken` prints everything as it will be heard: read it.
 
 ## Status
 
@@ -163,6 +220,10 @@ must be in time order and at most ~60 MIDI messages a millisecond; nothing befor
   the sync's tempo): `ctl_clk_ext` (USB / TRS chosen) makes arp_tick step only on the clock's grid (no clock running:
   the first note, then it waits); TEMPO locked (`knob_view_t.locked`: grey; turned: a toast), pget/param_value show the
   measured tempo ("TRS 125", "TRS ---"); a first measure after 24 clocks, then every 96 as before.
+- 0.6 (2026-11-19): screen reader support (issue #1, fm1-reader; see `mfm_speak.h` above). Messages that did not
+  happen are `warn()` (ANN_KEEP); TEMPO under a clock says "TEMPO NOT CHANGED|THE USB CLOCK SETS IT". ~4 KB flash,
+  ~1 KB RAM. Before release: the words file published (GitHub Pages, `curl -sI` the link: 200), the audit clean,
+  tried on the device (`../fm1-reader/tools/fm1_reader.py --where --seconds 20`), FMav-1 added to fm1-reader's list.
 - 0.5.2 (2026-11-18): ATTACK 153 ms at 10 o'clock (KNOB; was noon, the user by ear on the reference); ATT_FROM_051
   for the 0.5 / 0.5.1 saves (MFM5 / MFM6 -> MFM7; MFM6 keeps its GATE cables) and the factory programs' attacks;
   DECAY 1.2 s at noon and RELEASE 458 ms at 9 (the user), DEC_FROM_051 / REL_FROM_051 the same way (every program,

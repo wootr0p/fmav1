@@ -222,6 +222,15 @@ static void ota_commit(const uint8_t *parm)
 }
 #include "recovery.c"
 
+/* (0.6) a screen reader's SysEx out (announce.c, included by the app): never waits; no room (nobody reading), not
+ * sent. Its frames in are read before the updater looks (platform_poll) */
+static int ann_wire_send(const uint8_t *p, uint32_t n)
+{
+    if (!usb.config || usb.suspended || SXQ - (so_w - so_r) < (n + 2u) / 3u) return -1;
+    return ota_wire_send(p, n);
+}
+static int ann_frame(const uint8_t *p, uint32_t n, uint32_t now);
+
 /* ---- settings: [magic][length][crc32] then the bytes; settings_save erases the sector (~50 ms with
  * the interrupts off: the sound drops out), so save when nothing plays, not on every knob step */
 #define SETTINGS_MAGIC 0x59474E44u              /* "DNGY" */
@@ -432,6 +441,7 @@ extern void isr_timer5(void);
 static int32_t abuf[2u * HALF_WORDS] __attribute__((aligned(4)));
 static volatile int32_t master_q12 = 2048;
 static void app_audio(int32_t *out, uint32_t n);
+static void app_audio_out(int32_t *out, uint32_t n);   /* (0.6) the app's, after USB audio's copy: the outputs only */
 static void app_main(void);
 
 void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) */
@@ -455,6 +465,7 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
         }
         for (b = 0; b < HALF_FRAMES; b += 32u)
             UAC_ONLY(uac_tap(o + 2u * b, 32u));   /* the computer records what the speaker plays */
+        app_audio_out(o, HALF_FRAMES);          /* (0.6) what only the outputs hear (the FM-1's own voice) */
         for (i = 0; i < HALF_WORDS; i++)
             o[i] <<= 7;
         fm1_audio_ack_half();
@@ -470,6 +481,11 @@ static void platform_poll(void)
     int32_t a;
     fm1_wdt_feed();
     usb_retry(fm1_ms);
+    {                                           /* (0.6) a screen reader's SysEx (announce.c), then the updater's */
+        const uint8_t *p;
+        uint32_t n;
+        if (ota_frame_get(&p, &n) && ann_frame(p, n, fm1_ms)) ota_frame_done();
+    }
     ota_service();
     if (usb.ota_req) {
         usb.ota_req = 0;

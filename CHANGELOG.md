@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.6 (2026-11-19)
+
+- **Screen reader** (issue #1), two ways, the same words: on a computer, the page https://charlesvestal.github.io/fm1-reader/
+  (Chrome or Edge, the FM-1 on USB: its own voice or VoiceOver, NVDA, JAWS, TalkBack); or **the FM-1's own voice**,
+  no computer: **PLAY held 2 s** turns it on ("SCREEN READER ON", then the page) or off ("SCREEN READER OFF"), kept
+  after a power-off. What is said:
+  - on connecting or turning the voice on: the program and the track, then the page;
+  - a new page (a section's button, SELECT): its place among its button's pages and its title only ("1 OF 7. DELAY"; the VCO's
+    "OSCILLATOR", the VCF's "FILTER", the arp's "ARPEGGIATOR", without a state or a mode;
+    a button with one page: the title); the patchbay's overview, its cables ("LFO TO PWM"); the same button again on a
+    one-page section says it again;
+  - a knob touched, the first on the page or another than the last: its name at once ("L F O RATE"; a switch: its
+    ON / OFF);
+  - **a section's button held half a second** (as long as REC for its CCs): its page with every knob's value (the buttons act on the release now, as EDIT
+    and GLO did); HOME's mixer: PLAYING after a track whose meter shows;
+  - a knob of **few values** (25 at most: a switch, a mode, a **cable** "LFO TO FOLD IN", a note value, BEND):
+    **each value as it changes**; any other knob says nothing while it turns, but its **value when turned with REC
+    held** (once set) and its **value and MINIMUM / MAXIMUM the moment an end is reached** ("CUTOFF 19 KILOHERTZ,
+    MAXIMUM"); PRESETS the program (or the slot SAVE writes to), ALGORITHM the track, SELECT the page, once they stop;
+    not the octave (playing tells); a knob turned stops the page's reading (said or still to come);
+  - every message on the screen (KEYBOARD HOLD, the effects, SAVE, undo, the reset's question); a warning heard whole;
+  - never a MIDI CC, never the hint at the bottom right of the screen.
+  The short words in full (the user's list): TIME L "time left", KB "keyboard", EG "envelope", AMT "amount", 1V/OCT
+  "1 volt per octave", PRIO "legato priority", LIGHTS "lights brightness", GLIDE "portamento", SYNC
+  "synchronization", BEND "pitch bend", FOLD "wave fold", ANALOG "analog effect", TUNE "global tune", ONE (-5) "one normalized to minus
+  five", the chorus TYPE 1, 2, 1 plus 2, free; a switch by its whole name ("VCA MODE SWITCH"). One place makes every
+  text (`mfm_speak.h`) and both ways say it, so they never differ: the tests check every word said is in the voice's
+  dictionary and the page says them word for word. fm1-reader's shared code (`announce.c`, `tools/gen_words.py`,
+  MPL-2.0) is fm1-base's, by Charles Vestal; silent until a reader asks (a DAW on the same port never sees a byte).
+  The voice is Bigorna's formant synthesiser (Klatt, the DECtalk kind; Nuno Zimas, GPL-3.0), made on the FM-1 at 22
+  kHz, heard on the outputs (the music 6 dB lower while it speaks), not in USB audio; it pauses on commas and stops.
+  About 20 KB of flash and 2 KB of RAM; while it speaks, ~140 instructions a sample on the host (about 5 points of
+  the worst case's CPU).
+- **HOME > READER** (the user, the last of HOME's pages): the voice's **VOLUME** (0-10, on the MASTER knob's level),
+  **SPEED** (1-9: 1 the slowest, 4 at first), **PITCH** (80-200 Hz); the page shows, big, "FOR ACTIVATE THE SCREEN READER, HOLD PLAY/STOP".
+- **REC held** (the user): "TURN A KNOB TO KNOW ITS VALUE" said; each knob's MIDI CC in a badge over its middle, its value left in view (the patchbay: over
+  each input's jack); a knob turned with REC held doesn't turn the effects off when REC is let go.
+- **PLAY**: a tap is HOLD as before, now on the release; the message is **KEYBOARD HOLD ON / OFF**.
+- **REC** tapped: **EFFECTS ENGINE OFF / ON** (said "EFFECTS. ENGINE OFF").
+- **SAVE** says "SAVE PRESET, ROTATE THE PRESET KNOB FOR SELECT THE SLOT, SAVE AGAIN FOR CONFIRM"; held 0.6 s (no key
+  yet), the keys it opens ("F3 INIT, G3 RANDOM. A3 MUTATE, G5 RESET").
+- **ARPEGGIATOR** (the user): knob 1 is its **ON / OFF switch** (a new parameter, CC 89 / NRPN 72), **MODE** has only
+  the modes (UP .. RANDOM; CC 55 too), **GATE** on a second page (ARP again). A program saved before keeps its arp:
+  MODE OFF becomes the switch off, a mode the switch on with that mode.
+- TEMPO turned under an outside clock says what didn't happen: "TEMPO NOT CHANGED, THE USB CLOCK SETS IT".
+
 ## 0.5.2 (2026-11-18)
 
 - **ATTACK as the reference's** (the user, by ear: the reference's ATTACK at 10 o'clock sounds as 0.5.1's noon):

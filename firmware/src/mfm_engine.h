@@ -221,7 +221,7 @@ static void ev_note_on(uint32_t ti, uint32_t note, uint32_t vel)
     for (i = 0; i < t->nheld; i++) phys |= t->held[i].phys;
     if ((ctl_hold >> ti & 1u) && !phys) { t->nheld = 0; legato = 0; }   /* HOLD: a new chord replaces the held one */
     held_add(t, note, vel ? vel : 100u);
-    if (t->p->v[P_ARP_MODE]) return;            /* the arp plays it */
+    if (t->p->v[P_ARP_ON]) return;            /* the arp plays it */
     k = held_pick(t);
     if (legato && t->held[k].note == t->note) {   /* (a key above the low one: it plays on; ALWAYS retriggers) */
         if (t->p->v[P_RETRIG] == RT_ALWAYS) t->trig = 1;
@@ -232,7 +232,7 @@ static void ev_note_on(uint32_t ti, uint32_t note, uint32_t vel)
 static void voice_follow(track_t *t)            /* a key let go: on to the note the held ones now give, or silence */
 {
     uint32_t k;
-    if (t->p->v[P_ARP_MODE]) return;
+    if (t->p->v[P_ARP_ON]) return;
     if (!t->nheld) { t->kgate = 0; return; }
     k = held_pick(t);
     if (t->held[k].note != t->note || !t->kgate) voice_note(t, t->held[k].note, t->held[k].vel, t->kgate);
@@ -290,7 +290,7 @@ static void arp_step(track_t *t)
 {
     const uint8_t *pv = t->p->v;
     uint8_t nn[NHELD], vv[NHELD];
-    uint32_t n = t->nheld, i, j, oct = pv[P_ARP_OCT] % 4u + 1u, total, k, L, q, mode = pv[P_ARP_MODE];
+    uint32_t n = t->nheld, i, j, oct = pv[P_ARP_OCT] % 4u + 1u, total, k, L, q, mode = AR_UP + pv[P_ARP_MODE] % (NAR - 1u);
     for (i = 0; i < n; i++) { nn[i] = t->held[i].note; vv[i] = t->held[i].vel; }
     if (mode != AR_ORDER)                       /* by pitch (ORDER: as played) */
         for (i = 1; i < n; i++)
@@ -318,7 +318,7 @@ static void arp_tick(track_t *t)
     const uint8_t *pv = t->p->v;
     arp_t *a = &t->arp;
     uint32_t period, gate_len;
-    if (!pv[P_ARP_MODE]) {
+    if (!pv[P_ARP_ON]) {
         if (a->running) { a->running = 0; if (a->sounding) { a->sounding = 0; if (!t->nheld) t->kgate = 0; else voice_follow(t); } }
         return;
     }

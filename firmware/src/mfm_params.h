@@ -60,6 +60,7 @@ enum {
     P_NOISE,
     /* 0.5 (the user): the cutoff's fine tuning, +-2 semitones (EDIT > VCF, knob 3); the LFO RATE's (LFO, knob 4) */
     P_CUT_FINE, P_LFO_FINE,
+    P_ARP_ON,                                   /* (0.6, the user) the arpeggiator's switch (MODE was OFF or a mode) */
     NPARAM
 };
 #define NPARAM_01 45u                           /* 0.1's parameters (its programs: the name at 45; fmav1.c converts them) */
@@ -136,7 +137,7 @@ static const pdef_t PDEF[NPARAM] = {
     [P_RETRIG] = {"RETRIG", 1, RT_LEGATO, K_RETRIG, 0},
     [P_BEND] = {"BEND", 24, 2, K_BEND, 0},
     [P_DRIFT] = {"ANALOG", 127, 24, K_TEN, 0},
-    [P_ARP_MODE] = {"MODE", NAR - 1, AR_OFF, K_ARP, 0},
+    [P_ARP_MODE] = {"MODE", NAR - 2, 0, K_ARP, 0},   /* (0.6) AR_UP + v: UP .. RANDOM (on / off: P_ARP_ON) */
     [P_ARP_OCT] = {"OCTAVES", 3, 0, K_AOCT, 0},
     [P_ARP_RATE] = {"RATE", NARPDIV - 1, 11, K_ADIV, 0},
     [P_ARP_GATE] = {"GATE", 127, 64, K_PCT, 0},
@@ -167,6 +168,7 @@ static const pdef_t PDEF[NPARAM] = {
     [P_NOISE] = {"NOISE", 127, 0, K_TEN, 0},     /* 0.3.2 */
     [P_CUT_FINE] = {"CUT FINE", 127, 64, K_CFINE, 0},   /* 0.5: 64 = 0, +-200 cents (fine8) */
     [P_LFO_FINE] = {"RATE FINE", 127, 64, K_CFINE, 0},  /* 0.5: the same */
+    [P_ARP_ON] = {"ARP", 1, 0, K_ONOFF, 0},       /* (0.6) the arpeggiator on (CC 89) */
 };
 /* INIT (the defaults above, 0.5: the user's, set by the reference's): the saw, PULSE WIDTH 50 %, both MOD MIXes on
  * EG, the LFO a triangle, CUTOFF open, RESONANCE 0, ATTACK, DECAY, RELEASE 0, SUSTAIN full. The factory programs list
@@ -208,6 +210,11 @@ static inline int32_t fine8(uint32_t v) { int32_t o = ((int32_t)v - 64) * 512 / 
 static void patch_fix_values(uint8_t *v)      /* (0.3.2) a value out of its range (a slot not set: 0xFF) -> its default */
 {
     uint32_t i;
+    if (v[P_ARP_ON] == 0xFFu) {                 /* (0.6) saved before the ARP switch: MODE 0 was OFF, 1 .. 7 the modes */
+        uint32_t m = v[P_ARP_MODE];
+        v[P_ARP_ON] = (uint8_t)(m >= 1u && m < NAR);
+        v[P_ARP_MODE] = (uint8_t)(m >= 1u && m < NAR ? m - 1u : 0u);
+    }
     for (i = 0; i < NPARAM; i++) if (v[i] > PDEF[i].max) v[i] = PDEF[i].def;
 }
 /* (0.5.1) a program saved before 0.5 may have a cable from the CLOCK output: its slot is GATE now, the cable goes

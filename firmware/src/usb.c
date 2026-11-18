@@ -152,7 +152,7 @@ static uint8_t sx_frame[640];
 static uint32_t sx_pos;
 static volatile uint32_t sx_frame_len;
 static volatile uint8_t sx_ready, sx_collect, sx_busy;
-#define SXQ 64u
+#define SXQ 128u                                 /* (0.6: a screen reader's whole SAY, (240 + 9) / 3 packets) */
 static uint32_t sx_out_q[SXQ];
 static volatile uint32_t so_w, so_r;
 #endif

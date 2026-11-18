@@ -1,0 +1,151 @@
+# the screen reader (0.6): what a reader on the computer hears (tests/host.c: listen, said, said_none, where); every
+# message the panel shows, for the audit (tests/sr_audit.sh reads them from FMAV1_SAID_LOG). A new page: its title,
+# then its knobs' names (a switch with its value); a value turned: nothing until it has been still 0.5 s (the user)
+# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SAVE 10 ARP 11 SEQ 12 PLAY 13 REC
+# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS; keys: bit 0 F3, 2 G3, 4 A3, 26 G5
+2100 listen
+2150 said 1 OF 6. MIXER LEVELS
+2160 btndown 6
+2170 btn 0
+2180 btnup 6
+2250 said NOTHING TO UNDO
+2300 btn 7
+2600 said 1 OF 2. FILTER
+2600 said_none
+2700 enc 2 2
+2800 enc 2 2
+2900 enc 2 2
+3300 said CUTOFF
+3500 said_none
+3600 btn 1
+3700 said_none
+3800 btn 0
+3900 said_none
+4000 btndown 0
+4050 btn 1
+4100 btnup 0
+4200 said_none
+4300 btn 12
+4400 said HOLD ON
+4500 btn 12
+4600 said HOLD OFF
+4700 btn 13
+4800 said EFFECTS. ENGINE OFF
+4900 btn 13
+5000 said EFFECTS. ENGINE ON
+5100 btndown 13
+5900 said TURN A KNOB TO KNOW ITS VALUE
+5950 btnup 13
+6250 said_none
+6400 btndown 9
+6450 said_none
+6500 keys 0x1
+6550 keys 0
+6600 btnup 9
+6700 said INIT
+6800 btndown 9
+6850 keys 0x4
+6900 keys 0
+6950 btnup 9
+7000 said RANDOM SOUND
+7010 btndown 6
+7020 btn 0
+7030 btnup 6
+7040 said UNDO
+7050 btndown 6
+7060 btn 1
+7070 btnup 6
+7080 said REDO
+7100 btndown 9
+7150 keys 0x10
+7200 keys 0
+7250 btnup 9
+7300 said MUTATED
+7400 btndown 9
+7450 keys 0x4000000
+7500 keys 0
+7550 btnup 9
+7600 said RESET ALL MEMORY?
+7700 btn 5
+7800 said RESET CANCELLED
+7900 btn 9
+8000 said SAVE PRESET, ROTATE THE PRESET KNOB FOR SELECT THE SLOT, SAVE AGAIN FOR CONFIRM
+8100 enc 6 1
+8400 said_none
+8700 said SAVE TO 2?
+8800 btn 9
+8900 said SAVED
+9000 enc 6 1
+9100 enc 6 1
+9700 said PROGRAM 4 P W M LEAD
+9800 btn 9
+9900 btn 4
+10000 said SAVE CANCELLED
+10100 enc 1 1
+10200 enc 1 1
+10500 said_none
+10800 said TRACK 3
+10900 btn 11
+11200 said NO CABLES
+11300 btn 11
+11600 said 2 OF 4. INPUTS 1 TO 4
+11700 enc 3 1
+12300 said KEYBOARD C V TO 1 VOLT PER OCTAVE
+12400 where
+12500 said 2 OF 4. INPUTS 1 TO 4
+12600 btn 8
+12700 btn 8
+12800 btn 8
+12900 btn 8
+13200 said 4 OF 6. GLOBAL
+13300 enc 4 1
+13900 said CLOCK U S B
+14000 enc 5 1
+14600 said TEMPO NOT CHANGED
+14700 enc 4 -1
+15300 btn 10
+15600 said 1 OF 2. ARPEGGIATOR
+15700 btn 2
+16000 said 1 OF 7. DELAY
+16050 btn 5
+16350 said L F O
+16400 btn 5
+16700 said L F O
+# (0.6, the user) a knob turned with REC held: its value once set (REC let go: no effects off); an end at once; a
+# section's button held 1 s: its page with the values; a switch always
+16710 btndown 13
+16750 enc 3 2
+16900 btnup 13
+17100 said L F O WAVE
+17400 said L F O WAVE
+17500 enc 2 100
+17550 said L F O RATE 550 HERTZ, MAXIMUM
+17700 btndown 5
+18800 said 4 RATE FINE 0 CENTS
+18900 btnup 5
+19000 said_none
+19100 btn 2
+19500 said 1 OF 7. DELAY
+19600 enc 2 -1
+20200 said DELAY OFF
+20300 enc 2 1
+20900 said DELAY ON
+# (the user) HOME's mixer held: PLAYING after the track that sounds (its meter shows)
+21000 btn 8
+21010 keys 0x80
+21300 btndown 8
+22000 said 2 LEVEL 2 80, 3 LEVEL 3 80 PLAYING, 4 LEVEL 4 80
+22100 btnup 8
+22110 keys 0
+# (the user) a knob turned at once after a page's button: its reading never starts
+22150 btn 4
+22200 enc 3 1
+22900 said DECAY
+23000 btndown 9
+23700 said F3 INIT, G3 RANDOM. A3 MUTATE, G5 RESET
+23750 keys 0x4000000
+23800 keys 0
+23850 btnup 9
+24000 btn 1
+24100 said MEMORY RESET
+24400 end

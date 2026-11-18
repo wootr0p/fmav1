@@ -295,7 +295,9 @@ typedef struct {
     char value[16];
     int32_t v, max, bip, present;
     uint8_t style, icl, icr;                    /* the signs at the scale's ends */
-    uint8_t badge;                              /* (0.5.2) the value is a MIDI CC (REC held): drawn as a badge */
+    uint8_t badge;                              /* (0.5.2) REC held: 1 its MIDI CC (cc), 2 none; (0.6, the user) a
+                                                 * badge over the knob, its value left in view */
+    char cc[8];
     uint8_t locked;                             /* (0.4.1) not turnable now: grey (TEMPO under an outside clock) */
     uint16_t cable;                             /* a jack: its cable's colour (0: no cable) */
 } knob_view_t;
@@ -303,13 +305,17 @@ typedef struct {
 /* a knob's value under it; (0.5.2, the user) REC held, its MIDI CC in a badge: dark on the page's colour */
 static void knob_value(int32_t cx, int32_t y, const knob_view_t *kv, uint16_t c, uint16_t acc)
 {
-    if (kv->badge) {
-        int32_t w = aa_w(&FA10, kv->value) + 8;
-        cv_round(cx - w / 2, y + 1, w, 12, acc);
-        aa_text(cx - w / 2 + 4, y + 1, &FA10, kv->value, C_SH);
-        return;
-    }
+    (void)acc;
     aa_label_c(cx, y, &FA10, kv->value, c, KCELL_W);
+}
+static void knob_badge(int32_t cx, int32_t cy, const knob_view_t *kv, uint16_t acc)   /* (0.6, the user) REC held: the
+                                                 * MIDI CC over the knob's middle (none: grey) */
+{
+    int32_t w;
+    if (!kv->badge) return;
+    w = aa_w(&FA10, kv->cc) + 8;
+    cv_round(cx - w / 2, cy - 6, w, 13, kv->badge == 1u ? acc : C_INK2);
+    aa_text(cx - w / 2 + 4, cy - 6, &FA10, kv->cc, C_SH);
 }
 static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t acc, uint32_t glow)
 {
@@ -325,11 +331,13 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
         }
         cv_jack(cx, cy + 2, 9, kv->cable, 0);
         knob_value(cx, y0 + 64, kv, kv->cable ? acc : C_INK2, acc);
+        knob_badge(cx, cy + 2, kv, acc);
         return;
     }
     if (kv->style == KS_TOGGLE) {
         cv_toggle(cx, cy + 2, kv->v != 0, kv->top, kv->bot, acc);
         knob_value(cx, y0 + 64, kv, acc, acc);
+        knob_badge(cx, cy + 2, kv, acc);
         return;
     }
     ang = 240 - (kv->max ? 300 * kv->v / kv->max : 0);   /* (0.5: the reference panel turns 7 to 5 o clock, 300 degrees) */
@@ -362,11 +370,12 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
     if (kv->icl) cv_icon(cx - 25, cy + 16, kv->icl, C_INK2);
     if (kv->icr) cv_icon(cx + 17, cy + 16, kv->icr, C_INK2);
     knob_value(cx, y0 + 64, kv, acc, acc);
+    knob_badge(cx, cy, kv, acc);
 }
 
 /* the graphs a page can show (mfm_graph.h draws them) */
 enum { G_SCOPE, G_VCO, G_VMOD, G_VCF, G_FMOD, G_EG, G_VCA, G_LFO, G_SH, G_FOLD, G_UMIX, G_ATTN, G_PATCH, G_KB, G_ARP, G_CHO,
-       G_DLY, G_REV, G_TRACKS, NG };
+       G_DLY, G_REV, G_TRACKS, G_READ, NG };
 /* the modules (the tab of a page's box; TAB_NONE: the section's own) */
 enum { TAB_NONE = -1, TAB_VCO, TAB_VCF, TAB_EG, TAB_VCA, TAB_LFO, TAB_UTL, TAB_JACK, TAB_FX, NTAB };
 static const uint16_t TRKC[4] = {RGB(255, 84, 70), RGB(255, 204, 64), RGB(110, 222, 120), RGB(96, 172, 255)};

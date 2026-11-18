@@ -19,6 +19,10 @@ and the folder at audio rate).
 - **90 factory programs** (91-99 INIT): basses, leads, patchbay tricks, rhythmic sounds, pads, keys, drums and drones,
   each INIT plus only the knobs it needs and only what the reference panel has (the effects aside), so each can be
   set up on the real instrument too.
+- **Screen reader support**: with the FM-1 on USB, [FM-1 Screen Reader](https://charlesvestal.github.io/fm1-reader/)
+  (Chrome or Edge) says the program, the page and its knobs, every knob as it turns and every message, with its own
+  voice or the computer's screen reader. **Or with no computer**: PLAY held 2 s turns on the FM-1's own voice, the
+  same words in the headphones (not in USB audio).
 - Played from outside (TRS MIDI IN or USB-MIDI: notes, bend, aftertouch, mod wheel, sustain, program change, clock, a CC
   for every parameter, the cables included, and NRPN) or from the keys. No sequencer: sequence it from a Digitakt or
   anything that sends MIDI.

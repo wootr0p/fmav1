@@ -230,6 +230,7 @@ static int midi_get(uint8_t *st, uint8_t *d1, uint8_t *d2)
 static void midi_send(uint32_t st, uint32_t d1, uint32_t d2) { printf("%6u ms  MIDI out %02X %u %u\n", fm1_ms, st, d1, d2); }
 
 static void app_audio(int32_t *out, uint32_t n);
+static void app_audio_out(int32_t *out, uint32_t n);
 static void app_main(void);
 
 #ifdef OBV_WASM
@@ -240,12 +241,56 @@ static void platform_poll(void);                /* web/sim/sim.c: a millisecond 
  * argument) replaces it, a line each: "T keys MASK" (hex or decimal), "T btn ID", "T midi ST D1 D2" (USB; "T trs ST D1 D2":
  * the TRS jack), "T enc ID N"
  * (encoder ID turned N detents, + = clockwise), "T btndown ID" / "T btnup ID" (a button held, let go), "T end" */
-typedef struct { uint32_t t, keys; int btn; uint8_t st, d1, d2; int8_t enc, encn; uint8_t smk, sa; uint16_t sb; uint8_t cab; } host_ev_t;
+typedef struct { uint32_t t, keys; int btn; uint8_t st, d1, d2; int8_t enc, encn; uint8_t smk, sa; uint16_t sb; uint8_t cab; const char *txt; } host_ev_t;
 /* SMK-37 builds (BOARD_SMK37) also: "T vel V" (the velocity of the keys pressed from now), "T pad P V" (hardware pad
  * P hit at velocity V, V 0 = let go), "T fader F V" (0..127), "T wheel W RAW" (0 pitch, 1 mod; raw ADC 0..1023),
  * "T xkey K V" (keybed key K 0..36 at V, 0 = let go: the outer keys 0..4, 32..36), "T dump" (pads and state);
  * any build: "T shot" (the screen at T -> OUT-T.ppm) */
-enum { HS_NONE, HS_VEL, HS_PAD, HS_FADER, HS_WHEEL, HS_XKEY, HS_DUMP, HS_SHOT, HS_CHECK };
+enum { HS_NONE, HS_VEL, HS_PAD, HS_FADER, HS_WHEEL, HS_XKEY, HS_DUMP, HS_SHOT, HS_CHECK,
+       HS_LISTEN, HS_WHERE, HS_SAID, HS_SAIDNONE, HS_SPEAKDUMP };
+/* (0.6) the screen reader (announce.c): "T listen" (a reader listens: a HELLO now and every 2 s; each SAY printed,
+ * "said!:" for one that cuts in), "T where", "T said TEXT" (some SAY since the last check or listen has TEXT, else
+ * the run fails), "T said_none", "T speakdump" (every page, knob value and program as said: KIND<TAB>text).
+ * FMAV1_SAID_LOG=FILE: a reader listens from the start, quietly, and every SAY goes to FILE (MSG / WARN<TAB>text) */
+static int ann_frame(const uint8_t *p, uint32_t n, uint32_t now);
+static void speak_dump(void);
+static const uint8_t SR_HELLO[] = {0x7D, 0x53, 0x52, 1, 1}, SR_WHERE[] = {0x7D, 0x53, 0x52, 3};
+static char said_log[16384];
+static uint32_t said_len, said_count, sim_listen, said_print = 1, host_fail;
+static FILE *said_log_f;
+static int ann_wire_send(const uint8_t *p, uint32_t n)
+{
+    char t[300];
+    uint32_t i, k = 0;
+    if (n < 6u) return 0;
+    for (i = 6; i + 1u < n && k < sizeof t - 1u; i++) t[k++] = p[i] ? (char)p[i] : ' ';
+    t[k] = 0;
+    if (p[4] != 16u) { if (said_print) printf("%6u ms  hello: %s\n", fm1_ms, t); return 0; }
+    if (k == 1u && t[0] == ' ') { if (said_print) printf("%6u ms  said!: (cut off)\n", fm1_ms); return 0; }   /* (0.6: a
+                                                 * knob turned: what was being said stops; nothing to check) */
+    said_count++;
+    if (said_len + k + 2u < sizeof said_log) {
+        memcpy(said_log + said_len, t, k); said_len += k; said_log[said_len++] = '\n'; said_log[said_len] = 0;
+    }
+    if (said_print) printf("%6u ms  said%s: %s\n", fm1_ms, p[5] & 1u ? "!" : "", t);
+    if (said_log_f) fprintf(said_log_f, "%s\t%s\n", p[5] & 2u ? "WARN" : "MSG", t);
+    return 0;
+}
+static void said_reset(void) { said_len = 0; said_log[0] = 0; said_count = 0; }
+static void host_sr(const host_ev_t *e)
+{
+    switch (e->smk) {
+    case HS_LISTEN: sim_listen = 1; said_reset(); ann_frame(SR_HELLO, sizeof SR_HELLO, fm1_ms); break;
+    case HS_WHERE: ann_frame(SR_WHERE, sizeof SR_WHERE, fm1_ms); break;
+    case HS_SAID:
+        if (!strstr(said_log, e->txt)) { printf("%6u ms  FAIL: \"%s\" not said (said: %s)\n", fm1_ms, e->txt, said_len ? said_log : "nothing\n"); host_fail = 1; }
+        said_reset(); break;
+    case HS_SAIDNONE:
+        if (said_count) { printf("%6u ms  FAIL: said %u, none expected: %s", fm1_ms, said_count, said_log); host_fail = 1; }
+        said_reset(); break;
+    case HS_SPEAKDUMP: speak_dump(); break;
+    }
+}
 static const host_ev_t SCRIPT0[] = {
     {200, 1u << 7, -1, 0, 0, 0, -1, 0},                         /* C4 */
     {700, 1u << 7 | 1u << 11 | 1u << 14, -1, 0, 0, 0, -1, 0},   /* + E4 G4: a chord */
@@ -286,6 +331,16 @@ static void read_script(const char *path)
         else if (!strcmp(what, "dump")) e.smk = HS_DUMP;
         else if (!strcmp(what, "check")) e.smk = HS_CHECK;   /* (SMK: KNOB BANK pressed / let go: the panel check) */
         else if (!strcmp(what, "shot")) e.smk = HS_SHOT;   /* (any board: the screen now -> OUT-<ms>.ppm) */
+        else if (!strcmp(what, "listen")) e.smk = HS_LISTEN;
+        else if (!strcmp(what, "where")) e.smk = HS_WHERE;
+        else if (!strcmp(what, "said_none")) e.smk = HS_SAIDNONE;
+        else if (!strcmp(what, "speakdump")) e.smk = HS_SPEAKDUMP;
+        else if (!strcmp(what, "said")) {
+            char *q = strstr(line, "said") + 4, *z;
+            while (*q == ' ') q++;
+            if ((z = strpbrk(q, "\r\n"))) *z = 0;
+            e.smk = HS_SAID; e.txt = strdup(q);
+        }
         else if (!strcmp(what, "midi") || !strcmp(what, "trs")) { sscanf(line, "%*u %*s %i %u %u", (int *)&a, &b, &c); e.st = (uint8_t)a; e.d1 = (uint8_t)b; e.d2 = (uint8_t)c; e.cab = what[0] == 't'; }
         else continue;
         ev[n++] = e;
@@ -370,6 +425,8 @@ static void platform_poll(void)                 /* one call = one millisecond */
     while (step < script_n && script[step].t <= fm1_ms) {
         if (script[step].smk == HS_SHOT) {
             write_ppm(fm1_ms);
+        } else if (script[step].smk >= HS_LISTEN) {
+            host_sr(&script[step]);
         } else if (script[step].smk) {
 #if BOARD_SMK37
             static uint32_t vel = 100;
@@ -407,6 +464,8 @@ static void platform_poll(void)                 /* one call = one millisecond */
             fm1_in.notes = script[step].keys;
         step++;
     }
+    if (sim_listen && (fm1_ms % 2000u == 0u || fm1_ms == 1u))   /* (0.6) the reader's HELLO, as fm1-reader sends it */
+        ann_frame(SR_HELLO, sizeof SR_HELLO, fm1_ms);
     owed += FS;                                 /* the frames this millisecond is worth, in blocks as the ISR renders */
     while (owed >= 1000u * HALF_FRAMES) {
         uint32_t i;
@@ -416,6 +475,7 @@ static void platform_poll(void)                 /* one call = one millisecond */
         if (perf_fd >= 0) { ioctl(perf_fd, PERF_EVENT_IOC_RESET, 0); ioctl(perf_fd, PERF_EVENT_IOC_ENABLE, 0); }
 #endif
         app_audio(blk, HALF_FRAMES);
+        app_audio_out(blk, HALF_FRAMES);       /* (0.6: the voice, as the outputs hear it) */
 #ifdef __linux__
         if (perf_fd >= 0) {
             long long c = 0;
@@ -455,13 +515,17 @@ static void platform_poll(void)                 /* one call = one millisecond */
     if (fm1_ms >= end_ms) {
         write_wav();
         perf_report();
-        exit(0);
+        exit(host_fail ? 1 : 0);
     }
 }
 
 int main(int argc, char **argv)
 {
     if (argc > 1) host_out = argv[1];
+    if (getenv("FMAV1_SAID_LOG")) {             /* (0.6) a reader listens from the start, quietly: the log only */
+        said_log_f = fopen(getenv("FMAV1_SAID_LOG"), "a");
+        sim_listen = 1; said_print = 0;
+    }
     if (argc > 2) read_script(argv[2]);
     if (argc > 3) frame_fps = (uint32_t)atoi(argv[3]);
     perf_open();

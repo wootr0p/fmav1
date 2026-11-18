@@ -173,6 +173,11 @@ def build_app():
             raise SystemExit("OBV_DATA_FAMILY: 1..7 of A-Z 0-9")
         flags.append(f'-DOBV_DATA_FAMILY="{fam}"')
     flags += os.environ.get("OBV_DEFS", "").split()   # (a test build: OBV_DEFS=-DFELUCCA_UAC=0 ./build.sh)
+    # (0.6) the screen reader's words file (docs/words/<id>.json, published) and its link (firmware/gen/ann_words.h)
+    subprocess.run([sys.executable, "tools/gen_words.py", "firmware/words.tsv", "docs/words", "firmware/gen/ann_words.h"],
+                   check=True)
+    subprocess.run([sys.executable, "tools/gen_speech.py", "tools/voice_words.txt", "firmware/gen/voice_dict.h"],
+                   check=True)   # (0.6) the FM-1's own voice's dictionary
     cmds = [("cc", "-c", FW / "crt0.S", "-o", OUT / "crt0.o"),
             ("cc", "-c", FW / "hal" / "fm1_vec.S", "-o", OUT / "fm1_vec.o"),
             ("cc", "-c", FW / "hal" / "fm1_isr.S", "-o", OUT / "fm1_isr.o"),
