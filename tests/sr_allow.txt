@@ -1,3 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # (0.6) words FMav-1 means that a dictionary may lack (tests/sr_audit.sh, fm1-reader audit.mjs --allow)
 fmav
+attenuator
+omni
+centre
+pre-delay
+patchbay
+init
+# program names
+wah
+wob
+vox

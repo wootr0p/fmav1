@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1 (2026-11-19)
+
+- Screen reader: a mix at its middle ("50/50": VCO WAVE, LFO WAVE, VCO and VCF MOD MIX) is said "50 50", still heard
+  "fifty fifty" on both voices: fm1-reader's audit took "fifty fifty" for a word said twice. The audit now finds no
+  errors; its allow list (`tests/sr_allow.txt`) has the words FMav-1 means that its dictionary lacks (ATTENUATOR,
+  OMNI, CENTRE, PRE-DELAY, PATCHBAY, INIT and three programs' names). The words file is the same as 0.6's.
+
 ## 0.6 (2026-11-19)
 
 - **Screen reader** (issue #1), two ways, the same words: on a computer, the page https://charlesvestal.github.io/fm1-reader/

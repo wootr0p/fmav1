@@ -18,6 +18,12 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
 
+## Novità della 0.6.1
+
+- Lettore di schermo: un mix a metà ("50/50": VCO WAVE, LFO WAVE, VCO e VCF MOD MIX) si dice "50 50", e si sente
+  sempre "fifty fifty" con tutte e due le voci: il controllo di fm1-reader lo prendeva per una parola ripetuta. Ora
+  il controllo non trova errori.
+
 ## Novità della 0.6
 
 - **Lettore di schermo** (per chi non vede lo schermo), in due modi con le stesse parole: dal computer, la pagina

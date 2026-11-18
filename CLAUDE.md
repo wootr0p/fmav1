@@ -220,6 +220,10 @@ the step says SKIPPED). `sh tests/sr_audit.sh --spoken` prints everything as it 
   the sync's tempo): `ctl_clk_ext` (USB / TRS chosen) makes arp_tick step only on the clock's grid (no clock running:
   the first note, then it waits); TEMPO locked (`knob_view_t.locked`: grey; turned: a toast), pget/param_value show the
   measured tempo ("TRS 125", "TRS ---"); a first measure after 24 clocks, then every 96 as before.
+- 0.6.1 (2026-11-19): "50/50" said "50 50" (SP_WORDS; the audit's repeat check splits on any mark but lets digits
+  repeat, so "FIFTY-FIFTY" failed too); `tests/sr_allow.txt` extended. Audit (wamerican installed): 0 errors, 122
+  warnings: readout-short (the cables "X TO Y NORMALIZED TO Z" as the user asked, MOD MIX "L F O 68 PERCENT"; continuous
+  knobs are not said while turning anyway) and warning-says-what (NOTHING TO UNDO, RESET / SAVE CANCELLED).
 - 0.6 (2026-11-19): screen reader support (issue #1, fm1-reader; see `mfm_speak.h` above). Messages that did not
   happen are `warn()` (ANN_KEEP); TEMPO under a clock says "TEMPO NOT CHANGED|THE USB CLOCK SETS IT". ~4 KB flash,
   ~1 KB RAM. Before release: the words file published (GitHub Pages, `curl -sI` the link: 200), the audit clean,

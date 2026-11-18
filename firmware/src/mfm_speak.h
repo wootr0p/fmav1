@@ -98,7 +98,7 @@ static const char *const SP_WORDS[][2] = {
     {"VCO", "V C O"}, {"VCF", "V C F"}, {"VCA", "V C A"}, {"LFO", "L F O"}, {"PWM", "P W M"}, {"CV", "C V"},
     {"VELO", "VELOCITY"}, {"MODWHL", "MOD WHEEL"}, {"AFTERTC", "AFTERTOUCH"}, {"TRI", "TRIANGLE"}, {"USB", "U S B"},
     {"TRS", "T R S"}, {"FM", "F M"}, {"UFO", "U F O"}, {"PERC", "PERCUSSION"}, {"5TH", "FIFTH"}, {"2X", "2 TIMES"},
-    {"50/50", "FIFTY FIFTY"}, {"CC", "C C"},
+    {"50/50", "50 50"}, {"CC", "C C"},
     {"ARP", "ARPEGGIATOR"}, {"BEND", "PITCH BEND"}, {"ANALOG", "ANALOG EFFECT"}, {"TUNE", "GLOBAL TUNE"},
     {"GLIDE", "PORTAMENTO"}, {"SYNC", "SYNCHRONIZATION"},   /* (the user) */ {"kHz", "KILOHERTZ"}, {"Hz", "HERTZ"}, {"ms", "MILLISECONDS"}, {"st", "SEMITONES"},
     {"s", "SECONDS"}, {"c", "CENTS"},
