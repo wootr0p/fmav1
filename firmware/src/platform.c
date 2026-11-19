@@ -442,6 +442,7 @@ static int32_t abuf[2u * HALF_WORDS] __attribute__((aligned(4)));
 static volatile int32_t master_q12 = 2048;
 static void app_audio(int32_t *out, uint32_t n);
 static void app_audio_out(int32_t *out, uint32_t n);   /* (0.6) the app's, after USB audio's copy: the outputs only */
+static const int32_t *app_audio_usb(int32_t *out, uint32_t n);   /* (0.6.2) the app's, before: what USB audio takes */
 static void app_main(void);
 
 void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) */
@@ -463,9 +464,14 @@ void fm1_alnk0_irq(void)                       /* via isr_alnk0 (hal/fm1_isr.S) 
             master_gain_apply(o, HALF_FRAMES, master_last, m);
             master_last = m;
         }
-        for (b = 0; b < HALF_FRAMES; b += 32u)
-            UAC_ONLY(uac_tap(o + 2u * b, 32u));   /* the computer records what the speaker plays */
-        app_audio_out(o, HALF_FRAMES);          /* (0.6) what only the outputs hear (the FM-1's own voice) */
+        {
+            const int32_t *u = app_audio_usb(o, HALF_FRAMES);   /* (0.6.2) o, or a copy with what only USB audio gets
+                                                 * (the FM-1's own voice, READER > OUTPUT USB) */
+            for (b = 0; b < HALF_FRAMES; b += 32u)
+                UAC_ONLY(uac_tap(u + 2u * b, 32u));   /* the computer records what the speaker plays */
+            (void)u;
+        }
+        app_audio_out(o, HALF_FRAMES);          /* (0.6) what only the outputs hear (the voice, OUTPUT HEADPHONES) */
         for (i = 0; i < HALF_WORDS; i++)
             o[i] <<= 7;
         fm1_audio_ack_half();

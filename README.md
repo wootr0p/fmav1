@@ -22,7 +22,7 @@ and the folder at audio rate).
 - **Screen reader support**: with the FM-1 on USB, [FM-1 Screen Reader](https://charlesvestal.github.io/fm1-reader/)
   (Chrome or Edge) says the program, the page and its knobs, every knob as it turns and every message, with its own
   voice or the computer's screen reader. **Or with no computer**: PLAY held 2 s turns on the FM-1's own voice, the
-  same words in the headphones (not in USB audio).
+  same words on the outputs and in USB audio, or on just one of them (HOME > READER > OUTPUT).
 - Played from outside (TRS MIDI IN or USB-MIDI: notes, bend, aftertouch, mod wheel, sustain, program change, clock, a CC
   for every parameter, the cables included, and NRPN) or from the keys. No sequencer: sequence it from a Digitakt or
   anything that sends MIDI.

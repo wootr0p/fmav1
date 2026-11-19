@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.2 (2026-11-19)
+
+- **HOME > READER > OUTPUT** (knob 4, the user): where the FM-1's own voice goes. **MAIN** (the default): with the
+  music, on the outputs and in USB audio (0.6 kept it out of USB audio); **HEADPHONES**: the outputs only (the jack at
+  the back); **USB**: USB audio only. The music is 6 dB lower while it speaks only where the voice is. No SPEAKER
+  choice: the speaker and the jack get the same signal (one DAC), and no line is known that turns the speaker off,
+  so the voice can't be on the speaker alone; with nothing in the jack, HEADPHONES is heard on the speaker. Kept in
+  the settings (the byte that was spare: older settings start on MAIN).
+- A knob's value too wide for its cell even with tight letters (HEADPHONES) is drawn in the small letters.
+- Screen reader: an input with a normal (ONE, S+H, ATTN) says what it is normalized to only when its knob is on NO
+  CABLE ("NO CABLE TO S H NORMALIZED TO V C O"); with a cable in, only its name ("LFO TO S H"), in the patchbay's
+  list of cables too.
+- REC tapped: the screen's EFFECTS ENGINE ON / OFF shows the space between EFFECTS and ENGINE (the message's letters
+  have a 2-pixel space); said only "EFFECTS. ON" / "EFFECTS. OFF".
+- The Firmware Hub's description says FMav-1 is made for blind players too.
+- Screen reader, a discrete knob (25 values or fewer: a switch, a mode, a cable, BEND, OUTPUT): each value, the
+  value alone (its name only with the first value once it is touched: "DELAY OFF", then "ON"; a cable "LFO TO
+  FOLD IN", then "NOISE", "NO CABLE"), never MINIMUM / MAXIMUM; turned on against an end, its value again. A
+  continuous knob (more values) says its name when touched and, the moment it reaches an end, "MAXIMUM, 19
+  KILOHERTZ" ("MINIMUM, ..."), without its name.
+
 ## 0.6.1 (2026-11-19)
 
 - Screen reader: a mix at its middle ("50/50": VCO WAVE, LFO WAVE, VCO and VCF MOD MIX) is said "50 50", still heard

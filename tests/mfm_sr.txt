@@ -30,9 +30,9 @@
 4500 btn 12
 4600 said HOLD OFF
 4700 btn 13
-4800 said EFFECTS. ENGINE OFF
+4800 said EFFECTS. OFF
 4900 btn 13
-5000 said EFFECTS. ENGINE ON
+5000 said EFFECTS. ON
 5100 btndown 13
 5900 said TURN A KNOB TO KNOW ITS VALUE
 5950 btnup 13
@@ -119,7 +119,7 @@
 17100 said L F O WAVE
 17400 said L F O WAVE
 17500 enc 2 100
-17550 said L F O RATE 550 HERTZ, MAXIMUM
+17550 said MAXIMUM, 550 HERTZ
 17700 btndown 5
 18800 said 4 RATE FINE 0 CENTS
 18900 btnup 5
@@ -129,7 +129,7 @@
 19600 enc 2 -1
 20200 said DELAY OFF
 20300 enc 2 1
-20900 said DELAY ON
+20900 said ON
 # (the user) HOME's mixer held: PLAYING after the track that sounds (its meter shows)
 21000 btn 8
 21010 keys 0x80

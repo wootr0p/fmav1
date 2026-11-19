@@ -757,3 +757,6 @@ know	N OW1
 its	IH1 T S
 value	V AE1 L Y UW0
 oscillator	AA1 S AH0 L EY2 T ER0
+# 0.6.2: HOME > READER > OUTPUT
+output	AW1 T P UH2 T
+headphones	HH EH1 D F OW2 N Z

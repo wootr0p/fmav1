@@ -220,6 +220,20 @@ the step says SKIPPED). `sh tests/sr_audit.sh --spoken` prints everything as it 
   the sync's tempo): `ctl_clk_ext` (USB / TRS chosen) makes arp_tick step only on the clock's grid (no clock running:
   the first note, then it waits); TEMPO locked (`knob_view_t.locked`: grey; turned: a toast), pget/param_value show the
   measured tempo ("TRS 125", "TRS ---"); a first measure after 24 clocks, then every 96 as before.
+- 0.6.2 (2026-11-19): HOME > READER > OUTPUT (V_VOOUT, settings `vo_out`, the old `spare`: 0 = MAIN;
+  VO_OUT_MAIN / PHONES / USB). platform.c's ISR: `app_audio_usb(o)` before uac_tap (MAIN: vo_mix into o, both
+  hear it; USB: vo_mix into a copy `ub` that only uac_tap reads; the route latched per half in `vo_route`), then
+  `app_audio_out(o)` after (HEADPHONES: vo_mix into o; the CPU meter). tests/host.c does the same and, with
+  FMAV1_USB_WAV=1, writes OUT-usb.wav; tests/mfm_vo_out.txt + tools/voice_wav.py check each route. No SPEAKER: the
+  speaker and the jack share the DAC and no amp-enable / mute line is known (fmini-1 found none either). knob_value:
+  a value too wide even with -1 tracking falls back to FA8 (HEADPHONES overflowed and left a stale S).
+  (The user) an input's normal ("S+H (VCO)") said only on NO CABLE: `sp_jack_name(id, title, normal)` cuts the
+  " (...)" otherwise (a cable, sp_patchbay, a list of names). EFFECTS  ENGINE ON / OFF with two spaces on the screen
+  (FA12's space is 2 px: "EFFECTSENGINE"), said "EFFECTS. ON" / "EFFECTS. OFF" only. (The user's rule) discrete = 25 values or
+  fewer (`sp_discrete`: pmax + 1 <= 25, any jack; BEND's 0..24 in), continuous otherwise. A discrete knob says each
+  value alone (`sp_value`; `sp_knob`, name and value, with the first value after `sp_knob_touch`, `sp_touch_new`),
+  at an end its value again each detent, never MINIMUM / MAXIMUM; a continuous one its name on touch and "MAXIMUM,
+  <value>" at an end (queued after the name when just touched). Lists (page with values, patchbay) keep `sp_knob`. fmhub.json: "Made for blind players too ...".
 - 0.6.1 (2026-11-19): "50/50" said "50 50" (SP_WORDS; the audit's repeat check splits on any mark but lets digits
   repeat, so "FIFTY-FIFTY" failed too); `tests/sr_allow.txt` extended. Audit (wamerican installed): 0 errors, 122
   warnings: readout-short (the cables "X TO Y NORMALIZED TO Z" as the user asked, MOD MIX "L F O 68 PERCENT"; continuous

@@ -161,27 +161,42 @@ static void sp_name(int32_t id, const char *title)   /* a knob's name, on its pa
     }
     sp_cat(lb);
 }
+/* (0.6.2, the user) an input's name: "S+H (VCO)" says what it is normalized to only when its knob is on NO CABLE
+ * (normal 1); with a cable in, in the patchbay's list, in a list of names: "S+H", "ONE", "ATTN" */
+static void sp_jack_name(int32_t id, const char *title, int normal)
+{
+    uint32_t n0 = sp_n, i;
+    sp_name(id, title);
+    if (!normal)
+        for (i = n0; i + 1u < sp_n; i++)
+            if (sp_buf[i] == ' ' && sp_buf[i + 1u] == '(') { sp_n = i; sp_buf[sp_n] = 0; break; }
+}
 /* a knob as its page shows it: its name, then its value ("CUTOFF 612Hz"; REC held: "CUTOFF CC 74"). A jack (the user)
- * the other way round, as a cable runs: "LFO TO FOLD IN", "NO CABLE TO PWM", "NORMAL VCO TO S+H (VCO)". On its page, a
+ * the other way round, as a cable runs: "LFO TO FOLD IN", "NO CABLE TO PWM", "NO CABLE TO S+H (VCO)" (0.6.2: a cable in,
+ * "LFO TO S+H": the normal only with no cable), "NORMAL LFO TO S+H GATE". On its page, a
  * name that starts with the page's (title) says the rest: "LFO. RATE 3.26Hz", not "LFO. LFO RATE" */
-static void sp_knob(int32_t id, int32_t v, const char *title)
+/* (0.6.2, the user) a knob's value alone, as a knob turned says it ("612 HERTZ"). A jack's: the cable's output ("LFO"),
+ * or with no cable "NO CABLE", "NO CABLE, NORMALIZED TO V C O" (an input whose name gives its normal), "NORMAL L F O"
+ * (one whose normal is another output) */
+static void sp_value(int32_t id, int32_t v, const char *title)
 {
     char t[24];
     if (is_jack(id)) {
-        if (!v) {                               /* no cable: the normal it falls back on, if its name doesn't say it */
-            const char *nm = JIN_NORMAL[(uint32_t)(id - P_JACK) % NJIN], *lb = plabel(id);
-            uint32_t i, named = 0;
-            for (i = 0; lb[i]; i++) named |= lb[i] == '(';
-            if (nm[0] == '(' && !named) {       /* ("NORMAL LFO TO S+H GATE") */
-                sp_cat("NORMAL ");
-                for (i = 1; nm[i] && nm[i] != ')' && i < sizeof t; i++) { t[i - 1u] = nm[i]; t[i] = 0; }
-                sp_cat(t);
-            } else sp_cat("NO CABLE");
-        } else sp_cat(JSRC_NAME[(uint32_t)v % NJSRC]);
-        sp_cat(" TO "); sp_name(id, title);
+        const char *nm = JIN_NORMAL[(uint32_t)(id - P_JACK) % NJIN], *lb = plabel(id);
+        uint32_t i, j = 0;
+        if (v) { sp_cat(JSRC_NAME[(uint32_t)v % NJSRC]); return; }
+        for (i = 0; lb[i] && lb[i] != '('; i++) ;
+        if (lb[i]) {                            /* ("S+H (VCO)": "NO CABLE, NORMALIZED TO V C O") */
+            for (i++; lb[i] && lb[i] != ')' && j + 1u < sizeof t; i++) t[j++] = lb[i];
+            t[j] = 0;
+            sp_cat("NO CABLE, NORMALIZED TO "); sp_cat(t);
+        } else if (nm[0] == '(') {              /* ("NORMAL LFO", S+H GATE's) */
+            for (i = 1; nm[i] && nm[i] != ')' && j + 1u < sizeof t; i++) t[j++] = nm[i];
+            t[j] = 0;
+            sp_cat("NORMAL "); sp_cat(t);
+        } else sp_cat("NO CABLE");
         return;
     }
-    sp_name(id, title); sp_cat(" ");
     if (id == P_LFO_RATE && live.v[P_LFO_SYNC] && title) { sp_cat("SYNCED"); return; }   /* (on its page: SYNC says the value) */
     if (id == P_LFO_RATE && live.v[P_LFO_SYNC]) { sp_cat("SYNC "); sp_div(DIV_NAME[(live.v[P_LFO_SYNC] - 1u) % NCLKDIV]); return; }
     if (id >= V_PAN1 && id < V_PAN1 + 4) {      /* (the screen: "C", "L64", "R20") */
@@ -212,6 +227,25 @@ static void sp_knob(int32_t id, int32_t v, const char *title)
         }
     }
 }
+static void sp_knob(int32_t id, int32_t v, const char *title)
+{
+    if (is_jack(id)) {
+        if (!v) {                               /* no cable: the normal it falls back on, if its name doesn't say it */
+            const char *nm = JIN_NORMAL[(uint32_t)(id - P_JACK) % NJIN], *lb = plabel(id);
+            char t[24];
+            uint32_t i, named = 0;
+            for (i = 0; lb[i]; i++) named |= lb[i] == '(';
+            if (nm[0] == '(' && !named) {       /* ("NORMAL LFO TO S+H GATE") */
+                sp_cat("NORMAL ");
+                for (i = 1; nm[i] && nm[i] != ')' && i < sizeof t; i++) { t[i - 1u] = nm[i]; t[i] = 0; }
+                sp_cat(t);
+            } else sp_cat("NO CABLE");
+        } else sp_cat(JSRC_NAME[(uint32_t)v % NJSRC]);
+        sp_cat(" TO "); sp_jack_name(id, title, !v);
+        return;
+    }
+    sp_name(id, title); sp_cat(" "); sp_value(id, v, title);
+}
 static const int8_t PB_ORDER[12] = {I_FOLD, I_1VOCT, I_PWM, I_ONE, I_LFORATE, I_CUTOFF, I_GATE, I_VCACV, I_TWO, I_SHIN,
                                     I_SHGATE, I_ATTN};   /* (IT_PATCH's INPUTS pages: the panel's order) */
 static void sp_patchbay(void)                   /* the whole patchbay's cables, "LFO TO PWM" (REC held: the CCs) */
@@ -222,7 +256,7 @@ static void sp_patchbay(void)                   /* the whole patchbay's cables, 
         uint32_t s = live.v[id];
         if (!s || !jack_ok((uint32_t)PB_ORDER[i], s)) continue;
         if (n++) sp_cat(", ");
-        sp_cat(JSRC_NAME[s % NJSRC]); sp_cat(" TO "); sp_cat(plabel(id));
+        sp_cat(JSRC_NAME[s % NJSRC]); sp_cat(" TO "); sp_jack_name(id, 0, 0);   /* (0.6.2: "LFO TO S+H") */
     }
     if (!n) sp_cat("NO CABLES");
 }
@@ -269,6 +303,7 @@ static void sp_knobs(int values)
                 sp_cat(" PLAYING");
         }
         else if (sp_switch(id)) { sp_name(id, 0); sp_cat(" SWITCH"); }   /* (a switch: its whole name, "VCA MODE") */
+        else if (is_jack(id)) sp_jack_name(id, it->title, 0);   /* (0.6.2: "S+H"; its normal with NO CABLE) */
         else { sp_name(id, it->title); }   /* ("RESONANCE"; the user: "DELAY
                                                  * SWITCH", its state in the title, "DELAY OFF") */
     }
@@ -299,20 +334,30 @@ static void sp_where(void)                      /* everything on the screen: the
     sp_n = 0; sp_title(); sp_send(sp_out(), 0);
     if (on_patchbay()) { sp_n = 0; sp_knobs(0); sp_send(sp_out(), 0); }   /* (the page: its title; its knobs: touched) */
 }
-/* (0.6, the user) a knob with few values (a switch, a mode, a cable, a note value: 25 at most, BEND's 0 .. 24
- * semitones too) says each one as it comes ("LFO TO FOLD IN", "MODE UP"); any other knob says its end the moment it
- * gets there, with its value ("CUTOFF 19 KILOHERTZ, MAXIMUM"); pushed on against an end: once, unless it is a new turn */
-static int sp_discrete(int32_t id) { return is_jack(id) || pmax(id) <= 24u; }
+/* (0.6, the user) a discrete knob, 25 values or fewer (a switch, a mode, a cable, a note value), says each one as it
+ * comes ("LFO TO FOLD IN", "MODE UP"); turned on against an end (its value can't change: one a detent), its value
+ * again, never MINIMUM / MAXIMUM (0.6.2, the user). A continuous knob (more values) says its end the moment it gets
+ * there, with its value ("MAXIMUM, 19 KILOHERTZ"); pushed on against it: once, unless it is a new turn */
+static int sp_discrete(int32_t id) { return is_jack(id) || pmax(id) + 1u <= 25u; }   /* (the values: 0 .. pmax; the
+                                                 * user: 25 at most, so BEND's 0 .. 24 too) */
+static uint8_t sp_touch_new;                    /* (0.6.2) the knob turned now was just touched (sp_knob_touch) */
 static void sp_knob_change(int32_t id, int32_t was, uint32_t fresh)
 {
     int32_t v = pget(id);
-    int end = !is_jack(id) && (v <= 0 || v >= (int32_t)pmax(id));
+    uint32_t touched = sp_touch_new;
+    sp_touch_new = 0;
     if (!sp_on()) return;
-    if (sp_discrete(id)) { if (v == was && !(end && fresh)) return; }
-    else if (!end || (v == was && !fresh)) return;
-    sp_n = 0; sp_knob(id, v, 0);
-    if (end && !sp_switch(id)) sp_cat(v <= 0 ? ", MINIMUM" : ", MAXIMUM");
-    sp_send(sp_out(), ANN_NOW);
+    sp_n = 0;
+    if (sp_discrete(id)) {                      /* (0.6.2, the user) the value only; just touched: its name first,
+                                                 * once ("OUTPUT U S B", then "MAIN") */
+        if (touched) sp_knob(id, v, 0); else sp_value(id, v, 0);
+        sp_send(sp_out(), ANN_NOW);
+    } else {                                    /* (0.6.2, the user) "MAXIMUM, 19 KILOHERTZ": no name, said when it
+                                                 * was touched; just touched, after it */
+        if (!(v <= 0 || v >= (int32_t)pmax(id)) || (v == was && !fresh)) return;
+        sp_cat(v <= 0 ? "MINIMUM, " : "MAXIMUM, "); sp_value(id, v, 0);
+        sp_send(sp_out(), touched ? 0u : ANN_NOW);
+    }
     sp.after_page = 0;
 }
 /* (0.6, the user) a knob turned: the page's reading stops (it is said, or still to come): what is being said cut
@@ -329,9 +374,11 @@ static void sp_hush(void)
 static int32_t sp_touch_k = -1;                 /* (the knob touched last on this page; -1: none yet) */
 static void sp_knob_touch(uint32_t k, int32_t id)
 {
+    sp_touch_new = 0;
     if (!sp_on() || (int32_t)k == sp_touch_k) return;
     sp_touch_k = (int32_t)k;
-    if (sp_discrete(id)) return;
+    sp_touch_new = 1;
+    if (sp_discrete(id)) return;               /* (its name with its first value: sp_knob_change) */
     sp_n = 0; sp_name(id, 0);
     sp_send(sp_out(), ANN_NOW);
     sp.after_page = 0;

@@ -1,0 +1,54 @@
+# (0.6.2) HOME > READER > OUTPUT (knob 4): where the FM-1's own voice goes. MAIN (the default): the outputs and USB
+# audio; HEADPHONES: the outputs only; USB: USB audio only. tests/run_tests.sh checks the texts (a reader listens) and
+# where each WAV speaks (build/host/vo_out.wav the outputs, vo_out-usb.wav USB audio: FMAV1_USB_WAV=1)
+# buttons: 0 OCT- 1 OCT+ 2 FX 3 SEL 4 ENV 5 LFO 6 EDIT 7 GLO 8 HOME 9 SAVE 10 ARP 11 SEQ 12 PLAY 13 REC
+# encoders: 0 SELECT 1 ALGORITHM 2-5 KNOB 1-4 6 PRESETS
+2050 listen
+2200 btndown 12
+4300 said SCREEN READER ON
+4400 btnup 12
+# MAIN: both
+7000 btn 7
+7300 said 1 OF 2. FILTER
+# HOME six times: READER, OUTPUT to HEADPHONES
+9000 btn 8
+9100 btn 8
+9200 btn 8
+9300 btn 8
+9400 btn 8
+9500 btn 8
+9800 said 6 OF 6. READER
+11500 enc 5 1
+11800 said OUTPUT HEADPHONES
+12000 shot
+14000 btn 7
+14300 said 1 OF 2. FILTER
+# READER again, OUTPUT to USB
+16000 btn 8
+16100 btn 8
+16200 btn 8
+16300 btn 8
+16400 btn 8
+16500 btn 8
+16800 said 6 OF 6. READER
+18500 enc 5 1
+18800 said OUTPUT U S B
+19000 shot
+# (a discrete knob turned on against its end: its value again, alone, no MAXIMUM)
+19500 enc 5 1
+19800 said U S B
+21000 btn 7
+21300 said 1 OF 2. FILTER
+# READER again, OUTPUT back to MAIN
+23000 btn 8
+23100 btn 8
+23200 btn 8
+23300 btn 8
+23400 btn 8
+23500 btn 8
+23800 said 6 OF 6. READER
+25500 enc 5 -2
+25800 said OUTPUT MAIN
+28000 btn 7
+28300 said 1 OF 2. FILTER
+30000 end

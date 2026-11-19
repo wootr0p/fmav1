@@ -1,5 +1,5 @@
 {
-  "what": "A semi-modular mono synth: VCO, self-oscillating 4-pole ladder filter, LFO, ADSR, VCA, wave folder, S+H, mixer and a patchbay with normals and dummy plugs. Four tracks on their own MIDI channels, MIDI clock sync, arpeggiator, chorus, delay and reverb, 90 sounds.",
+  "what": "A semi-modular mono synth: VCO, self-oscillating 4-pole ladder filter, LFO, ADSR, VCA, wave folder, S+H, mixer and a patchbay with normals and dummy plugs. Four tracks on their own MIDI channels, MIDI clock sync, arpeggiator, chorus, delay and reverb, 90 sounds. Made for blind players too: a screen reader says every page, knob and message, in the FM-1's own voice or through FM-1 Screen Reader on a computer.",
   "author": "wootrop & gpix",
   "kinds": [
     "synth"

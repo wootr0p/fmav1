@@ -18,6 +18,27 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
 
+## Novità della 0.6.2
+
+- **HOME > READER > OUTPUT** (manopola 4): dove va la voce dell'FM-1. **MAIN** (all'inizio): con la musica, sulle
+  uscite e nell'audio USB (nella 0.6 non andava nell'audio USB); **HEADPHONES**: solo sulle uscite (la presa dietro);
+  **USB**: solo nell'audio USB. La musica si abbassa di 6 dB mentre parla solo dove c'è la voce. Non c'è SPEAKER:
+  l'altoparlante e la presa ricevono lo stesso segnale (un solo convertitore), e non si conosce un modo di spegnere
+  l'altoparlante dal firmware, quindi la voce non può andare solo sull'altoparlante; senza niente nella presa,
+  HEADPHONES si sente dall'altoparlante. La scelta resta salvata (le impostazioni di prima partono da MAIN).
+- Un valore troppo largo per la sua manopola (HEADPHONES) si scrive con le lettere piccole.
+- Lettore di schermo: un ingresso con un collegamento interno (ONE, S+H, ATTN) dice a cosa è normalizzato solo quando
+  la sua manopola è su NO CABLE ("NO CABLE TO S H NORMALIZED TO V C O"); con un cavo, solo il nome ("LFO TO S H"),
+  anche nell'elenco dei cavi del patchbay.
+- REC con un tocco: sullo schermo si vede lo spazio fra EFFECTS ed ENGINE (EFFECTS ENGINE ON / OFF); a voce dice
+  solo "EFFECTS. ON" / "EFFECTS. OFF".
+- La descrizione su The Firmware Hub dice che FMav-1 è pensato anche per chi non vede.
+- Lettore di schermo, una manopola discreta (25 valori o meno: un interruttore, un modo, un cavo, BEND, OUTPUT):
+  ogni valore, solo il valore (il nome solo col primo valore quando la tocchi: "DELAY OFF", poi "ON"; un cavo
+  "LFO TO FOLD IN", poi "NOISE", "NO CABLE"), mai MINIMUM / MAXIMUM; girata ancora contro un estremo, ridice il
+  valore. Una manopola continua (più valori) dice il nome quando la tocchi e, appena arriva a un estremo,
+  "MAXIMUM, 19 KILOHERTZ" ("MINIMUM, ..."), senza il nome.
+
 ## Novità della 0.6.1
 
 - Lettore di schermo: un mix a metà ("50/50": VCO WAVE, LFO WAVE, VCO e VCF MOD MIX) si dice "50 50", e si sente
@@ -299,7 +320,7 @@ solo posto; i cavi si collegano da SEQ.
 
 | Pulsante | Le pagine che SELECT scorre |
 | --- | --- |
-| **HOME** | **MIXER**: i LEVEL delle 4 tracce · i loro PAN → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, CLOCK, TEMPO · KEY VEL, LIGHTS (in alto a destra la CPU) → **READER**: VOLUME, SPEED, PITCH della voce |
+| **HOME** | **MIXER**: i LEVEL delle 4 tracce · i loro PAN → **VOICE**: BEND, ANALOG → **GLOBAL**: MIDI CH, TUNE, CLOCK, TEMPO · KEY VEL, LIGHTS (in alto a destra la CPU) → **READER**: VOLUME, SPEED, PITCH, OUTPUT della voce |
 | **EDIT** | **VCO**: PITCH, VCO WAVE, PULSE WIDTH, FINE · **MOD**: VCO MOD MIX, PITCH MOD AMT, PWM AMT |
 | **ENV** | **EG**: ATTACK, DECAY, SUSTAIN, RELEASE → **VCA**: VOLUME, **VCA MODE** (EG / ON) |
 | **LFO** | **LFO**: LFO RATE, LFO WAVE, **SYNC**, RATE FINE |

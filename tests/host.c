@@ -231,6 +231,7 @@ static void midi_send(uint32_t st, uint32_t d1, uint32_t d2) { printf("%6u ms  M
 
 static void app_audio(int32_t *out, uint32_t n);
 static void app_audio_out(int32_t *out, uint32_t n);
+static const int32_t *app_audio_usb(int32_t *out, uint32_t n);
 static void app_main(void);
 
 #ifdef OBV_WASM
@@ -354,6 +355,8 @@ static void read_script(const char *path)
 static const char *host_out = "build/host/fmav1";
 static int16_t *wav;
 static uint32_t wav_n;
+static int16_t *uwav;                           /* (0.6.2) FMAV1_USB_WAV=1: USB audio too -> OUT-usb.wav */
+static uint32_t uwav_n;
 
 static void write_ppm_as(const char *name)
 {
@@ -377,19 +380,24 @@ static void write_ppm(uint32_t t)
     printf("%6u ms  screen -> %s\n", t, name);
 }
 
-static void write_wav(void)
+static void write_wav_as(const char *suffix, const int16_t *w, uint32_t n)
 {
     char name[512];
     FILE *f;
-    uint32_t bytes = wav_n * 4u, v[] = {16, 0x00020001u, FS, FS * 4u, 0x00100004u};
-    snprintf(name, sizeof name, "%s.wav", host_out);
+    uint32_t bytes = n * 4u, v[] = {16, 0x00020001u, FS, FS * 4u, 0x00100004u};
+    snprintf(name, sizeof name, "%s%s.wav", host_out, suffix);
     if (!(f = fopen(name, "wb"))) { perror(name); exit(1); }
     fwrite("RIFF", 1, 4, f); bytes += 36; fwrite(&bytes, 4, 1, f); bytes -= 36;
     fwrite("WAVEfmt ", 1, 8, f); fwrite(v, 4, 5, f);
     fwrite("data", 1, 4, f); fwrite(&bytes, 4, 1, f);
-    fwrite(wav, 4, wav_n, f);
+    if (n) fwrite(w, 4, n, f);
     fclose(f);
-    printf("sound  -> %s (%u frames)\n", name, wav_n);
+    printf("sound  -> %s (%u frames)\n", name, n);
+}
+static void write_wav(void)
+{
+    write_wav_as("", wav, wav_n);
+    if (getenv("FMAV1_USB_WAV")) write_wav_as("-usb", uwav, uwav_n);   /* (0.6.2: what USB audio got) */
 }
 
 /* OBV_PERF=1: the instructions the renders take, per sample (Linux perf counter; the chip runs other code, but
@@ -475,6 +483,17 @@ static void platform_poll(void)                 /* one call = one millisecond */
         if (perf_fd >= 0) { ioctl(perf_fd, PERF_EVENT_IOC_RESET, 0); ioctl(perf_fd, PERF_EVENT_IOC_ENABLE, 0); }
 #endif
         app_audio(blk, HALF_FRAMES);
+        {
+            const int32_t *u = app_audio_usb(blk, HALF_FRAMES);   /* (0.6.2: what USB audio takes, as platform.c) */
+            if (getenv("FMAV1_USB_WAV")) {
+                uwav = realloc(uwav, (uwav_n + HALF_FRAMES) * 4u);
+                for (i = 0; i < 2u * HALF_FRAMES; i++) {
+                    int32_t v = u[i];
+                    uwav[2u * uwav_n + i] = (int16_t)(v > 32767 ? 32767 : v < -32767 ? -32767 : v);
+                }
+                uwav_n += HALF_FRAMES;
+            }
+        }
         app_audio_out(blk, HALF_FRAMES);       /* (0.6: the voice, as the outputs hear it) */
 #ifdef __linux__
         if (perf_fd >= 0) {
@@ -489,7 +508,7 @@ static void platform_poll(void)                 /* one call = one millisecond */
 #endif
         wav = realloc(wav, (wav_n + HALF_FRAMES) * 4u);
         for (i = 0; i < 2u * HALF_FRAMES; i++) {
-            int32_t v = blk[i];                 /* (USB audio at the MASTER knob all the way up) */
+            int32_t v = blk[i];                 /* (the outputs at the MASTER knob all the way up) */
             wav[2u * wav_n + i] = (int16_t)(v > 32767 ? 32767 : v < -32767 ? -32767 : v);
         }
         wav_n += HALF_FRAMES;

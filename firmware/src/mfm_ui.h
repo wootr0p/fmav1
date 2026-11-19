@@ -306,7 +306,11 @@ typedef struct {
 static void knob_value(int32_t cx, int32_t y, const knob_view_t *kv, uint16_t c, uint16_t acc)
 {
     (void)acc;
-    aa_label_c(cx, y, &FA10, kv->value, c, KCELL_W);
+    if (aa_wt(&FA10, kv->value, -1) > KCELL_W)  /* (0.6.2) too wide even tight (READER > OUTPUT's HEADPHONES): the
+                                                 * small letters, so it stays in its cell */
+        aa_label_c(cx, y + 2, &FA8, kv->value, c, KCELL_W);
+    else
+        aa_label_c(cx, y, &FA10, kv->value, c, KCELL_W);
 }
 static void knob_badge(int32_t cx, int32_t cy, const knob_view_t *kv, uint16_t acc)   /* (0.6, the user) REC held: the
                                                  * MIDI CC over the knob's middle (none: grey) */

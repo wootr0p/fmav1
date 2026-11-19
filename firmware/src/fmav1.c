@@ -62,13 +62,14 @@ typedef struct {
     uint8_t kvel, lights;                       /* kvel: the keys' velocity; lights: the backlight + 1 (0: the default) */
     uint8_t tprog[NTRK], lvl[NTRK];             /* each track's program; the mixer's level (100 = unity) */
     int8_t pan[NTRK];                           /* the mixer's pan -64..64 */
-    uint8_t fx_off, clk_src, voice, spare;      /* 0.3: REC off: every effect off (the sounds keep theirs); 0.4.1: the
+    uint8_t fx_off, clk_src, voice, vo_out;     /* 0.3: REC off: every effect off (the sounds keep theirs); 0.4.1: the
                                                  * clock's source, CLK_INT / CLK_USB / CLK_TRS; 0.6: the FM-1's own
-                                                 * voice, the screen reader (PLAY held 2 s) */
+                                                 * voice, the screen reader (PLAY held 2 s); 0.6.2: where it goes,
+                                                 * VO_OUT_* (HOME > READER > OUTPUT; the old spare byte, 0: MAIN) */
     uint8_t vo_set, vo_vol, vo_speed, vo_pitch; /* (0.6, the user) HOME > READER: the voice's VOLUME 0..10, SPEED
                                                  * 0..8 (1..9 shown), PITCH (VO_PITCH_HZ); vo_set not 2: the defaults */
 } settings_t;
-#define SET_SIZE_05 __builtin_offsetof(settings_t, vo_set)   /* (0.3 .. 0.6's first builds' save: up to spare) */
+#define SET_SIZE_05 __builtin_offsetof(settings_t, vo_set)   /* (0.3 .. 0.6's first builds' save: up to vo_out) */
 static settings_t set;
 #define SET_SIZE_02 __builtin_offsetof(settings_t, fx_off)   /* (0.2's save: up to pan) */
 enum { CLK_INT, CLK_USB, CLK_TRS };             /* (0.4.1, the user: the tempo internal, or synced over USB or the TRS) */
@@ -193,6 +194,7 @@ enum { AC_PERF, AC_VCO, AC_VCF, AC_ENV, AC_LFO, AC_UTL, AC_JACK, AC_GLOB, AC_FX 
 #define V_VOVOL 216                             /* (0.6) HOME > READER: the voice */
 #define V_VOSPD 217
 #define V_VOPITCH 218
+#define V_VOOUT 219                             /* (0.6.2) READER > OUTPUT */
 #define NONE (-1)
 /* an item: its title, which knobs on which page, its accent, the module tab it lights, each page's graph and subtitle,
  * a hint for the footer */
@@ -210,8 +212,8 @@ static const item_t IT_HOME[] = {
     {"VOICE", 1, AC_GLOB, TAB_NONE, {G_SCOPE}, {0}, {{P_BEND, P_DRIFT, NONE, NONE}}, "ANALOG: THE|DRIFT"},
     {"GLOBAL", 2, AC_GLOB, TAB_NONE, {G_SCOPE, G_SCOPE}, {0, 0}, {{V_MIDICH, V_TUNE, V_CLKSRC, V_TEMPO}, {V_KVEL, V_LIGHTS, NONE, NONE}},
         NTRK > 1 ? "CH N: TRACK 1|N+1: TRACK 2 .." : "MIDI CH: THE|TRACK'S CHANNEL"},
-    {"READER", 1, AC_GLOB, TAB_NONE, {G_READ}, {0}, {{V_VOVOL, V_VOSPD, V_VOPITCH, NONE}},   /* (0.6, the user) the
-                                                 * FM-1's own voice */
+    {"READER", 1, AC_GLOB, TAB_NONE, {G_READ}, {0}, {{V_VOVOL, V_VOSPD, V_VOPITCH, V_VOOUT}},   /* (0.6, the
+                                                 * user) the FM-1's own voice; 0.6.2: its OUTPUT */
         "HOLD PLAY: SCREEN|READER ON / OFF"},
 };
 #define HOME_GLOBAL 2u                          /* IT_HOME's GLOBAL (its CPU meter) */
@@ -294,6 +296,11 @@ static uint32_t ncables(const uint8_t *v)
 }
 
 static const char *const CLK_NAME[3] = {"INTERNAL", "USB", "TRS"};
+/* (0.6.2, the user) HOME > READER > OUTPUT, where the voice goes: MAIN with the music (the outputs and USB audio);
+ * HEADPHONES the outputs only (the jack at the back; the speaker plays it with nothing in the jack: one DAC feeds
+ * both, and no line is known to cut the speaker, so no SPEAKER choice); USB, USB audio only (app_audio_usb) */
+enum { VO_OUT_MAIN, VO_OUT_PHONES, VO_OUT_USB };
+static const char *const VO_OUT_NAME[3] = {"MAIN", "HEADPHONES", "USB"};
 static uint32_t clk_bpm(void) { uint32_t q = quarter_len(); return (FS * 60u + q / 2u) / q; }   /* the tempo heard */
 
 /* ---- parameters, real and virtual */
@@ -309,6 +316,7 @@ static uint32_t pmax(int32_t id)
     case V_VOVOL: return 10;
     case V_VOSPD: return VO_NRATE - 1u;
     case V_VOPITCH: return VO_NPITCH - 1u;
+    case V_VOOUT: return VO_OUT_USB;
     default:
         if (id >= V_PAN1 && id < V_PAN1 + 4) return 128;
         return 127;
@@ -329,6 +337,7 @@ static int32_t pget(int32_t id)
     case V_VOVOL: return set.vo_vol;
     case V_VOSPD: return set.vo_speed;
     case V_VOPITCH: return set.vo_pitch;
+    case V_VOOUT: return set.vo_out;
     default:
         if (id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK) return set.lvl[id - V_LVL1];
         if (id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK) return set.pan[id - V_PAN1] + 64;
@@ -372,6 +381,7 @@ static void pset_t(uint32_t t, int32_t id, int32_t v)   /* track t's sound, or a
     case V_VOVOL: set.vo_vol = (uint8_t)v; break;
     case V_VOSPD: set.vo_speed = (uint8_t)v; vo_settings(set.vo_speed, set.vo_pitch); break;
     case V_VOPITCH: set.vo_pitch = (uint8_t)v; vo_settings(set.vo_speed, set.vo_pitch); break;
+    case V_VOOUT: set.vo_out = (uint8_t)v; break;
     default:
         if (id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK) { set.lvl[id - V_LVL1] = (uint8_t)v; ctl_lvl[id - V_LVL1] = (uint8_t)v; break; }
         if (id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK) { set.pan[id - V_PAN1] = (int8_t)(v - 64); ctl_pan[id - V_PAN1] = (int8_t)(v - 64); break; }
@@ -394,6 +404,7 @@ static const char *plabel(int32_t id)
     case V_VOVOL: return "VOLUME";
     case V_VOSPD: return "SPEED";
     case V_VOPITCH: return "PITCH";
+    case V_VOOUT: return "OUTPUT";
     default:
         if (id >= V_LVL1 && id < V_LVL1 + 4) return NTRK > 1u ? LVL[id - V_LVL1] : "LEVEL";
         return NTRK > 1u ? PAN[(id - V_PAN1) & 3] : "PAN";
@@ -488,6 +499,7 @@ static void param_value(char *s, int32_t id, int32_t v)   /* <= 8 characters */
         case V_CLKSRC: scat(s, CLK_NAME[(uint32_t)v % 3u]); return;
         case V_VOSPD: fmt_u(s, (uint32_t)v + 1u); return;   /* (0.6) 1 slowest .. 9 fastest */
         case V_VOPITCH: fmt_u(s, VO_PITCH_HZ[(uint32_t)v % VO_NPITCH]); scat(s, "Hz"); return;
+        case V_VOOUT: scat(s, VO_OUT_NAME[(uint32_t)v % 3u]); return;
         default:
             if (id >= V_PAN1 && id < V_PAN1 + 4) {
                 if (v == 64) scat(s, "C"); else { scat(s, v < 64 ? "L" : "R"); fmt_u(s + 1, (uint32_t)(v < 64 ? 64 - v : v - 64)); }
@@ -1230,9 +1242,10 @@ static void buttons(void)
         else {                                  /* REC tapped (0.3, the user): every effect off / on again, as
                                                  * they were (0.5.2: on the release) */
             set.fx_off ^= 1u; ctl_fx_off = set.fx_off; set_dirty = 1; set_t = fm1_ms;
-            if (set.fx_off) say_as("EFFECTS ENGINE OFF", "EFFECTS. ENGINE OFF");   /* (0.6, the user: the stop said,
-                                                 * not shown) */
-            else say_as("EFFECTS ENGINE ON", "EFFECTS. ENGINE ON");
+            if (set.fx_off) say_as("EFFECTS  ENGINE OFF", "EFFECTS. OFF");   /* (0.6, the user: the stop said,
+                                                 * not shown; 0.6.2: two spaces, FA12's is 2 px; said
+                                                 * "EFFECTS. OFF" only, the user) */
+            else say_as("EFFECTS  ENGINE ON", "EFFECTS. ON");
             dirty_hdr = 1;
             if (sec == S_FX) dirty_page = dirty_graph = 1;
         }
@@ -1351,14 +1364,42 @@ static void voice_toggle(void)
 }
 /* (0.6) the voice's VOLUME (HOME > READER, 0..10: 8 the level it had) on the MASTER knob's, Q12 */
 static int32_t vo_level(int32_t master) { return master * (int32_t)set.vo_vol / 8; }
+#ifdef OBV_HOST
+#define VO_MASTER 4096                          /* (the host: the MASTER knob all the way up) */
+#else
+#define VO_MASTER master_q12
+#endif
+/* (0.6.2) the voice where OUTPUT sends it (latched for a half: a knob turned between the two calls moves it whole) */
+static uint8_t vo_route;
+static const int32_t *app_audio_usb(int32_t *o, uint32_t n)   /* before USB audio's copy (platform.c): what it takes */
+{
+    static int32_t ub[2u * HALF_FRAMES];        /* (OUTPUT USB: the half with the voice, for USB audio only) */
+    const int32_t *u = o;
+#ifndef OBV_HOST
+    uint32_t t0 = fm1_ticks();
+#endif
+    vo_route = set.vo_out;
+    if (vo_route == VO_OUT_MAIN)
+        vo_mix(o, n, vo_level(VO_MASTER));      /* (with the music: the outputs and the computer hear it) */
+    else if (vo_route == VO_OUT_USB && n <= HALF_FRAMES) {
+        memcpy(ub, o, n * 2u * sizeof ub[0]);
+        vo_mix(ub, n, vo_level(VO_MASTER));     /* (the music ducked there only: the outputs play it as it is) */
+        u = ub;
+    }
+#ifndef OBV_HOST
+    ui_render_us += (fm1_ticks() - t0) / FM1_TICKS_PER_US;
+#endif
+    return u;
+}
 static void app_audio_out(int32_t *o, uint32_t n)   /* (0.6) after USB audio's copy (platform.c): what only the
-                                                 * outputs hear, the voice at the MASTER knob's level */
+                                                 * outputs hear, the voice at the MASTER knob's level (OUTPUT
+                                                 * HEADPHONES) */
 {
 #ifdef OBV_HOST
-    vo_mix(o, n, vo_level(4096));
+    if (vo_route == VO_OUT_PHONES) vo_mix(o, n, vo_level(VO_MASTER));
 #else
     uint32_t t0 = fm1_ticks();
-    vo_mix(o, n, vo_level(master_q12));
+    if (vo_route == VO_OUT_PHONES) vo_mix(o, n, vo_level(VO_MASTER));
     ui_render_us += (fm1_ticks() - t0) / FM1_TICKS_PER_US;   /* (the CPU meter: the engine and the voice) */
     cpu_meter_add(&cpu_m, ui_render_us, fm1_ms);
 #endif
@@ -1448,6 +1489,7 @@ static void settings_fix(void)
         set.vo_set = 2; set.vo_vol = 8; set.vo_speed = 3; set.vo_pitch = 3;
     }
     vo_settings(set.vo_speed, set.vo_pitch);
+    if (set.vo_out > VO_OUT_USB) set.vo_out = VO_OUT_MAIN;
     set.fx_off = set.fx_off ? 1u : 0u;
     if (set.clk_src > CLK_TRS) set.clk_src = CLK_INT;
     ctl_clk_ext = set.clk_src != CLK_INT;

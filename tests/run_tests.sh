@@ -55,6 +55,12 @@ voice() {   # (0.6) PLAY held 2 s: the voice on, its texts; the outputs speak, t
     python3 tools/voice_wav.py "$OUT/voice.wav" 2.3-4.1:quiet 4.3-5.5:speech 10.3-11.5:speech 30.2-31.4:quiet
 }
 run "the FM-1's own voice: PLAY held 2 s on and off, the outputs speak (build/host/voice.wav)" voice
+vo_out() {   # (0.6.2) READER > OUTPUT: MAIN the outputs and USB audio, HEADPHONES the outputs only, USB USB audio only
+    FMAV1_USB_WAV=1 sh tests/run_host.sh tests/mfm_vo_out.txt vo_out > "$OUT/vo_out.txt" 2>&1 || { grep FAIL "$OUT/vo_out.txt"; return 1; }
+    python3 tools/voice_wav.py "$OUT/vo_out.wav" 4.3-5.5:speech 14.3-15.3:speech 18.8-25.4:quiet 25.6-26.6:speech 28.3-29.3:speech &&
+    python3 tools/voice_wav.py "$OUT/vo_out-usb.wav" 4.3-5.5:speech 11.7-18.4:quiet 18.6-19.6:speech 21.3-22.3:speech 28.3-29.3:speech
+}
+run "the voice's OUTPUT: MAIN both, HEADPHONES the outputs only, USB in USB audio only (build/host/vo_out*.wav)" vo_out
 run "four tracks: channels N .. N+3, ALGORITHM, the mixer (build/host/tracks-*.png)" sh tests/run_host.sh tests/mfm_tracks.txt tracks
 run "the worst case on four tracks: everything at audio rate on each, chorus, delay and reverb" sh tests/run_host.sh tests/mfm_cpu.txt cpu4
 run "the screens for the manual: a lead's pages, the patchbay (build/host/screens-*.png)" sh tests/run_host.sh tests/mfm_screens.txt screens

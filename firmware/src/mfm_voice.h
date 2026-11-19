@@ -9,8 +9,9 @@
  * the phoneme in the low 6 bits, its stress in the top 2). The audio interrupt reads them from a ring as it speaks,
  * makes each one into one to three segments (targets: formants, amplitudes, a duration, a transition) and moves
  * between the targets a frame (64 samples) at a time. Fixed point only: no float, no 64-bit division. It runs at
- * 22050 Hz, doubled to the audio's 44100 Hz; while it speaks the music is 6 dB lower. It goes to the outputs (after
- * USB audio took its copy: platform.c app_audio_out), not to the computer, and follows the MASTER knob.
+ * 22050 Hz, doubled to the audio's 44100 Hz; while it speaks the music is 6 dB lower. It follows the MASTER knob and
+ * goes where HOME > READER > OUTPUT says (0.6.2; fmav1.c app_audio_usb, app_audio_out): MAIN with the music, to the
+ * outputs and USB audio; HEADPHONES to the outputs only (after USB audio took its copy); USB to USB audio only.
  *
  * THE WORDS. vo_text() turns the text into phonemes: words from the dictionary (tools/voice_words.txt, packed by
  * tools/gen_speech.py into firmware/gen/voice_dict.h; tests/voice_words.sh checks every word FMav-1 says is
@@ -487,7 +488,7 @@ static int32_t vo_sample(void)
     return (x >> 1) + fr;
 }
 
-/* (audio, after USB audio took its copy) n stereo frames at 44100 Hz: the music ducked 6 dB while the voice speaks,
+/* (audio, where OUTPUT sends it) n stereo frames at 44100 Hz: the music ducked 6 dB while the voice speaks,
  * the voice added at the MASTER knob's level (m, Q12) */
 static void vo_mix(int32_t *o, uint32_t n, int32_t m)
 {
