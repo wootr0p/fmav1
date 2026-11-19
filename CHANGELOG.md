@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.3 (2026-11-19)
+
+- Screen reader: **OCT- / OCT+ say the octave** again, as their light shows it, the number first: "PLUS 2 OCTAVE"
+  (the light: +-1 lit, +-2 blinking slow, +-3 fast), "MINUS 1 OCTAVE", and pressed on at the end, again; both
+  together "0 OCTAVE".
+- **The knobs glide**: a continuous knob turned (or its MIDI CC) no longer moves the sound in steps. Its value glides
+  to the new one in ~12 ms: CUTOFF, RESONANCE, PULSE WIDTH, the waves (they glided in ~3 ms), PITCH, FINE, the fines,
+  LFO RATE, ANALOG, KB SCALE, the mod mixes and amounts, VOLUME, ATTENUATOR, ONE LVL, FOLD, NOISE, SUSTAIN, the
+  effects' sends, rates, depths, feedback, cuts, widths, decay, damping, diffusion, pre-delay, the mixer's PAN and
+  GLOBAL TUNE. Not the times (ATTACK, DECAY, RELEASE, GLIDE, the gates: a speed, no step to hear), nor the switches,
+  modes and cables. A program loaded comes at once (CUTOFF and the others too: they glided from the last program's);
+  at rest every knob gives exactly its value (CUTOFF and the others stopped a hair under a value reached from below).
+  The 90 programs sound as in 0.6.2 (a patch with S+H, noise or a singing filter never repeats sample for sample).
+  The worst case's CPU: +1.3 % (+27 instructions a sample).
+- **The knobs on the screen glide** too: a knob turned slides to its new place (a quarter of the way every frame, every
+  ~12 ms or more) instead of jumping; a page drawn anew shows them where they are at once.
+
 ## 0.6.2 (2026-11-19)
 
 - **HOME > READER > OUTPUT** (knob 4, the user): where the FM-1's own voice goes. **MAIN** (the default): with the

@@ -220,6 +220,18 @@ the step says SKIPPED). `sh tests/sr_audit.sh --spoken` prints everything as it 
   the sync's tempo): `ctl_clk_ext` (USB / TRS chosen) makes arp_tick step only on the clock's grid (no clock running:
   the first note, then it waits); TEMPO locked (`knob_view_t.locked`: grey; turned: a toast), pget/param_value show the
   measured tempo ("TRS 125", "TRS ---"); a first measure after 24 clocks, then every 96 as before.
+- 0.6.3 (2026-11-19): OCT- / OCT+ said again, the number first (the user: `sp_tell("+2 OCTAVE")`, sp_out: PLUS 2;
+  both: say_as("OCTAVE 0", "0 OCTAVE")).
+  The knobs glide (the user): `SM_IDS` (32 continuous knobs, not the times) in `track_t.sm8[NPARAM]` (Q8),
+  `sm_tick` a block (an eighth looked at, the moving ones stepped by `sm_to`: a 32nd of the way, ~12 ms, there
+  within 32; the user: "un po' piu di smooth", "ancora piu"; cut_sm, res_sm, pw_sm, wave_sm, lw_sm by sm_to too, snapped too),
+  `SM_F(q8, mx, F)` = F of the step + a line to the next (no fraction: exactly F). With the >>3 rate and the old
+  slews untouched the 90 programs' WAV was 0.6.2's bit for bit; now loudness within ~0.2 dB, chaotic patches (S+H,
+  noise, a singing ladder) diverge. `ctl_snap[t]` (trk_load, undo) and `sm_snap` at the half's start: a program at once.
+  The effects read their owner track's sm8 (`chs_block(p, s8)`, `fxs_block(pd, sd, pr, sr, q)`; widen takes
+  WIDTH x 129); the sends a block at a time once a knob glided in the half (`smv`); `pan8`, `tune_sm`. CPU on
+  mfm_cpu: 2081 -> 2108 instructions a sample. The screen: `knob_view` eases `kn_a16[k]` a quarter of the way a draw
+  (redrawn via dirty_knob), `kn_snap` in draw_page; `knob_view_t.ang16` drives the pointer and the arc.
 - 0.6.2 (2026-11-19): HOME > READER > OUTPUT (V_VOOUT, settings `vo_out`, the old `spare`: 0 = MAIN;
   VO_OUT_MAIN / PHONES / USB). platform.c's ISR: `app_audio_usb(o)` before uac_tap (MAIN: vo_mix into o, both
   hear it; USB: vo_mix into a copy `ub` that only uac_tap reads; the route latched per half in `vo_route`), then

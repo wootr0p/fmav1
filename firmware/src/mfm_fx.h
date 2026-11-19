@@ -79,9 +79,9 @@ static inline __attribute__((always_inline)) int32_t line_read_q12(const line_t 
     return a + (((c - a) * f) >> 8);
 }
 /* the width of a stereo pair: 0 = mono, 127 = as it is (mid / side) */
-static inline void widen(int32_t *l, int32_t *r, int32_t w127)
+static inline void widen(int32_t *l, int32_t *r, int32_t wk)   /* wk: WIDTH x 129 (0.6.3: gliding) */
 {
-    int32_t m = (*l + *r) >> 1, s = (((*l - *r) >> 1) * (w127 * 129)) >> 14;   /* (x w / 127 without a division) */
+    int32_t m = (*l + *r) >> 1, s = (((*l - *r) >> 1) * wk) >> 14;   /* (x w / 127 without a division) */
     *l = m + s;
     *r = m - s;
 }
@@ -129,14 +129,17 @@ static void fx_init(void)
     dly_cl = dly_cr = 11025 << 12;
 }
 
-/* the chorus, once per ISR call: pc the sound whose chorus it is (0: off; switched on, it starts from silence) */
-static void chs_block(const patch_t *pc)
+/* the chorus, once per ISR call: pc the sound whose chorus it is (0: off; switched on, it starts from silence), s8
+ * its knobs gliding (0.6.3, mfm_engine.h SM_F) */
+#define F_CHINC(x) ((int32_t)CH_INC[(x) & 127])
+#define F_CHDEP(x) ((int32_t)(x) * (110 << 16) / 127 / 2048)
+static void chs_block(const patch_t *pc, const int32_t *s8)
 {
     if (pc && !chs.on) { line_clear(&chs.l); chs.lp[0] = chs.lp[1] = 0; }
     chs.on = pc != 0;
     if (!pc) return;
-    chs.inc = CH_INC[pc->v[P_CH_RATE] & 127u];
-    chs.depth = (int32_t)pc->v[P_CH_DEPTH] * (110 << 16) / 127 / 2048;   /* up to +-2.5 ms, per triangle step (Q16 samples) */
+    chs.inc = (uint32_t)SM_F(s8[P_CH_RATE], 127, F_CHINC);
+    chs.depth = SM_F(s8[P_CH_DEPTH], 127, F_CHDEP);   /* up to +-2.5 ms, per triangle step (Q16 samples) */
 }
 
 static void rev_clear(void)
@@ -147,11 +150,20 @@ static void rev_clear(void)
     rv_lp_in = rv_lpl = rv_lpr = rv_yl = rv_yr = rv_hold = 0;
 }
 
-/* the shared delay and reverb, once per ISR call: pd / pr the sound whose delay / reverb they are (0: off) */
-static void fxs_block(const patch_t *pd, const patch_t *pr, uint32_t quarter)
+/* the shared delay and reverb, once per ISR call: pd / pr the sound whose delay / reverb they are (0: off), sd / sr
+ * their knobs gliding (0.6.3) */
+#define F_FB(x) ((int32_t)(x) * 250)
+#define F_DLC(x) ((int32_t)DLC_K[(x) & 127])
+#define F_DHC(x) ((int32_t)DHC_K[(x) & 127])
+#define F_WK(x) ((int32_t)(x) * 129)
+#define F_RDEC(x) (12000 + (((int32_t)(x) * (int32_t)(x) * 19500) >> 14))
+#define F_RDAMP(x) clampi(32768 - (int32_t)(x) * (int32_t)(x) * 2, 64, 32767)
+#define F_RPRE(x) ((int32_t)(1u + (uint32_t)(x) * (REV_PRE_N - 2u) / 127u))
+#define F_RG1(x) (9830 + (int32_t)(x) * 117)
+#define F_RG2(x) (8192 + (int32_t)(x) * 97)
+static void fxs_block(const patch_t *pd, const int32_t *sd, const patch_t *pr, const int32_t *sr, uint32_t quarter)
 {
     uint32_t t;
-    int32_t d;
     if (pd && !fxs.dl_on && dl_dirty) { dl_clr = 0; dl_dirty = 0; dly_lp[0] = dly_lp[1] = dly_hp[0] = dly_hp[1] = 0; }
     if (pr && !fxs.rv_on && rv_dirty) { rev_clear(); rv_dirty = 0; }
     fxs.dl_on = pd != 0;
@@ -159,23 +171,21 @@ static void fxs_block(const patch_t *pd, const patch_t *pr, uint32_t quarter)
     if (pd) {
         const uint8_t *v = pd->v;
         fxs.dl_ping = v[P_DL_PING];
-        fxs.dl_fb = v[P_DL_FB] * 250;           /* Q15, up to 0.97 */
+        fxs.dl_fb = SM_F(sd[P_DL_FB], 127, F_FB);   /* Q15, up to 0.97 */
         t = div_frames(quarter, 18u - v[P_DL_TIMEL] % NDLYDIV); if (t > DLY_MAX - 4u) t = DLY_MAX - 4u; if (t < 32u) t = 32u;
         fxs.dl_tl = (int32_t)(t << 12);
         t = div_frames(quarter, 18u - v[P_DL_TIMER] % NDLYDIV); if (t > DLY_MAX - 4u) t = DLY_MAX - 4u; if (t < 32u) t = 32u;
         fxs.dl_tr = (int32_t)(t << 12);
-        fxs.dl_klo = DLC_K[v[P_DL_LOW] & 127u]; fxs.dl_khi = DHC_K[v[P_DL_HIGH] & 127u];
-        fxs.dl_width = v[P_DL_WIDTH];
+        fxs.dl_klo = SM_F(sd[P_DL_LOW], 127, F_DLC); fxs.dl_khi = SM_F(sd[P_DL_HIGH], 127, F_DHC);
+        fxs.dl_width = SM_F(sd[P_DL_WIDTH], 127, F_WK);
     }
     if (pr) {
-        const uint8_t *v = pr->v;
-        d = v[P_RV_DECAY]; fxs.rv_decay = 12000 + ((d * d * 19500) >> 14);   /* 0.37 .. 0.96 */
-        d = v[P_RV_DAMP]; fxs.rv_damp_k = clampi(32768 - d * d * 2, 64, 32767);   /* (the one-pole at the half rate) */
-        fxs.rv_pre = 1u + (uint32_t)v[P_RV_PRE] * (REV_PRE_N - 2u) / 127u;
-        fxs.rv_width = v[P_RV_WIDTH];
-        d = v[P_RV_DIFF];
-        fxs.rv_g1 = 9830 + d * 117;             /* the input diffusers: 0.30 .. 0.75 (the paper's 0.75 at 127) */
-        fxs.rv_g2 = 8192 + d * 97;              /* 0.25 .. 0.625 */
+        fxs.rv_decay = SM_F(sr[P_RV_DECAY], 127, F_RDEC);   /* 0.37 .. 0.96 */
+        fxs.rv_damp_k = SM_F(sr[P_RV_DAMP], 127, F_RDAMP);   /* (the one-pole at the half rate) */
+        fxs.rv_pre = (uint32_t)SM_F(sr[P_RV_PRE], 127, F_RPRE);
+        fxs.rv_width = SM_F(sr[P_RV_WIDTH], 127, F_WK);
+        fxs.rv_g1 = SM_F(sr[P_RV_DIFF], 127, F_RG1);   /* the input diffusers: 0.30 .. 0.75 (the paper's 0.75 at 127) */
+        fxs.rv_g2 = SM_F(sr[P_RV_DIFF], 127, F_RG2);   /* 0.25 .. 0.625 */
     }
 }
 

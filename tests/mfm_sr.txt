@@ -18,13 +18,13 @@
 3300 said CUTOFF
 3500 said_none
 3600 btn 1
-3700 said_none
+3700 said PLUS 1 OCTAVE
 3800 btn 0
-3900 said_none
+3900 said 0 OCTAVE
 4000 btndown 0
 4050 btn 1
 4100 btnup 0
-4200 said_none
+4200 said 0 OCTAVE
 4300 btn 12
 4400 said HOLD ON
 4500 btn 12

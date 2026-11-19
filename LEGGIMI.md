@@ -18,6 +18,20 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
 
+## Novità della 0.6.3
+
+- Lettore di schermo: **OCT- / OCT+ dicono di nuovo l'ottava**, come la mostra la loro luce, prima il numero: "PLUS 2
+  OCTAVE" (la luce: +-1 accesa, +-2 lampeggia piano, +-3 veloce), "MINUS 1 OCTAVE", e premuto ancora all'estremo,
+  di nuovo; insieme "0 OCTAVE".
+- **Le manopole scorrono**: una manopola continua girata (o il suo CC MIDI) non muove più il suono a scatti. Il valore
+  arriva al nuovo in ~12 ms: CUTOFF, RESONANCE, PULSE WIDTH, le forme d'onda (prima ~3 ms), PITCH, FINE, i fine, LFO
+  RATE, ANALOG, KB SCALE, i mix e le quantità di modulazione, VOLUME, ATTENUATOR, ONE LVL, FOLD, NOISE, SUSTAIN,
+  mandate e parametri degli effetti, il PAN del mixer e GLOBAL TUNE. Non i tempi (ATTACK, DECAY, RELEASE, GLIDE, i
+  gate: una velocità, nessuno scatto da sentire), né interruttori, modi e cavi. Un programma caricato arriva subito;
+  da ferme le manopole danno esattamente il loro valore. I 90 programmi suonano come nella 0.6.2.
+- **Anche le manopole sullo schermo scorrono**: girata, una manopola arriva alla nuova posizione scivolando (un quarto
+  della strada a ogni fotogramma) invece di saltare; una pagina ridisegnata le mostra subito dove sono.
+
 ## Novità della 0.6.2
 
 - **HOME > READER > OUTPUT** (manopola 4): dove va la voce dell'FM-1. **MAIN** (all'inizio): con la musica, sulle

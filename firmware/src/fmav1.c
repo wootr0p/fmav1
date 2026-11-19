@@ -170,6 +170,7 @@ static const char *toast;
 static uint32_t toast_t;
 static char toast_buf[40];
 static void ann_toast(const char *s, uint32_t flags);   /* (0.6) a screen reader hears it too (mfm_speak.h) */
+static void sp_tell(const char *s);             /* (mfm_speak.h) */
 static void say(const char *s) { toast = s; toast_t = fm1_ms; dirty_map = 1; ann_toast(s, ANN_NOW); }
 /* (0.6) something did not happen: a screen reader says it whole (what follows does not cut it off) */
 static void warn(const char *s) { toast = s; toast_t = fm1_ms; dirty_map = 1; ann_toast(s, ANN_NOW | ANN_KEEP); }
@@ -578,6 +579,7 @@ static void trk_load(uint32_t t, uint32_t n)    /* track t: program n */
     t %= NTRK;
     prog_get(n, &p);
     live_p[t] = p;
+    ctl_snap[t] = 1;                            /* (0.6.3: a program comes at once; a knob glides) */
     set.tprog[t] = (uint8_t)(n % NPROG);
     edited[t] = 0;
     set_dirty = 1; set_t = fm1_ms;
@@ -924,6 +926,8 @@ static void cc_text(knob_view_t *kv, int32_t id)   /* (0.5.2) REC held: "CC 74" 
     if (cc) { scat(kv->cc, "CC "); fmt_u(kv->cc + 3, cc); kv->badge = 1; }
     else { scat(kv->cc, "NO CC"); kv->badge = 2; }
 }
+static int32_t kn_a16[4], kn_id[4] = {-2, -2, -2, -2};   /* (0.6.3) each knob's angle as drawn, the knob it was */
+static uint8_t kn_snap;                         /* (a page drawn whole: the knobs where they are) */
 static void knob_view(knob_view_t *kv, uint32_t k)
 {
     int32_t id = page_param(k);
@@ -935,6 +939,15 @@ static void knob_view(knob_view_t *kv, uint32_t k)
     kv->bip = is_bip(id);
     kv->style = KS_KNOB; kv->icl = kv->icr = IC_NONE; kv->cable = 0; kv->top = kv->bot = 0; kv->badge = 0;
     kv->locked = id == V_TEMPO && set.clk_src != CLK_INT;
+    {                                           /* (0.6.3, the user) the drawn knob glides to its value: a quarter of the
+                                                 * way a frame (12 ms or more), there within 1.5 degrees; drawn again till then.
+                                                 * Another knob in its place, or the page drawn whole: at once */
+        int32_t tg = (240 - (kv->max ? 300 * kv->v / kv->max : 0)) * 16, d = tg - kn_a16[k & 3u];
+        if (kn_snap || kn_id[k & 3u] != id || (d > -24 && d < 24)) kn_a16[k & 3u] = tg;
+        else { kn_a16[k & 3u] += d / 4; dirty_knob |= 1u << k; }
+        kn_id[k & 3u] = id;
+        kv->ang16 = kn_a16[k & 3u];
+    }
     param_value(kv->value, id, kv->v);
     if (is_jack(id)) {
         kv->style = KS_JACK; kv->cable = kv->v ? CABLE_C[kv->v % NJSRC] : 0;
@@ -1006,7 +1019,9 @@ static void draw_page(void)
         if (cpu_m.over) { scat(note, "LATE "); fmt_u(note + 5, cpu_m.over); }
         else { fmt_u(note, cpu_m.peak); scat(note, " us"); }
     }
+    kn_snap = 1;
     for (k = 0; k < 4u; k++) knob_view(&kv[k], k);
+    kn_snap = 0;
     page_map(&pm);
     ui_page(tab_text(it), it->title, sub, &pm, note[0] ? note : 0, kv, acc_colour(it));
     memset(an_knob, 0, sizeof an_knob);
@@ -1197,16 +1212,23 @@ static void buttons(void)
             edit_used = 1;
             if (undo_ok) {                      /* (on the track it was done on) */
                 patch_t t = live_p[undo_trk % NTRK];
-                live_p[undo_trk % NTRK] = undo_p; undo_p = t; mark_edited_t(undo_trk);
+                live_p[undo_trk % NTRK] = undo_p; undo_p = t; mark_edited_t(undo_trk); ctl_snap[undo_trk % NTRK] = 1;
                 dirty_hdr = dirty_page = dirty_map = dirty_graph = 1; say(b & (1u << BTN_OCT_DOWN) ? "UNDO" : "REDO");
             }
             else warn("NOTHING TO UNDO");
         } else if ((fm1_in.buttons & (3u << BTN_OCT_DOWN)) == (3u << BTN_OCT_DOWN)) {
-            set.oct = 0; set_dirty = 1; set_t = fm1_ms; show("OCTAVE 0"); dirty_hdr = 1;   /* (0.6, the user: not said) */
+            set.oct = 0; set_dirty = 1; set_t = fm1_ms; say_as("OCTAVE 0", "0 OCTAVE"); dirty_hdr = 1;   /* (0.6.3, the
+                                                 * user: said again, the number first) */
         } else {
+            char s[16];
             if (b & (1u << BTN_OCT_DOWN) && set.oct > -3) set.oct--;
             if (b & (1u << BTN_OCT_UP) && set.oct < 3) set.oct++;
             set_dirty = 1; set_t = fm1_ms; dirty_hdr = 1;
+            s[0] = 0;                          /* (0.6.3, the user) what the LED shows, said, the number first: "PLUS 2
+                                                 * OCTAVE" (+-1 lit, +-2 slow, +-3 fast); at the end, again */
+            fmt_s(s, set.oct);                 /* ("+2", "-1", "0": said PLUS 2, MINUS 1) */
+            scat(s, " OCTAVE");
+            sp_tell(s);
         }
     }
     {                                           /* (0.6, the user) a section's button: tapped, its page (on the

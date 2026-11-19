@@ -27,6 +27,18 @@
 #define NHELD 16u
 #define ENV_ONE (1 << 24)                       /* the EG's top: 8 V */
 #define LEVEL_FLOOR 2048                        /* -78 dB: a release below this is over */
+/* (0.6.3, the user: a knob turned glides, not in steps) a knob smoothed (Q8: the value x 256) through F, what the
+ * engine makes of a value 0 .. mx: F of the step it is on, a straight line to the next by the fraction. At rest (no
+ * fraction) exactly F of the value, as before */
+#define SM_F(q8, mx, F) __extension__ ({ int32_t sm_q_ = (q8), sm_i_ = sm_q_ >> 8, sm_f_ = sm_q_ & 255, sm_a_ = (F(sm_i_)); \
+    sm_f_ ? sm_a_ + ((((F(sm_i_ < (mx) ? sm_i_ + 1 : sm_i_)) - sm_a_) * sm_f_) >> 8) : sm_a_; })
+static inline int32_t sm_to(int32_t s, int32_t target)   /* a step of the glide: a 32nd of the way a block (16
+                                                 * samples: ~12 ms, the user: "un po' piu di smooth", then "ancora
+                                                 * piu"), there once within 32 (an eighth of a step) */
+{
+    int32_t d = target - s;
+    return d > -32 && d < 32 ? target : s + (d >> 5);
+}
 
 enum { E_IDLE, E_ATT, E_DEC, E_REL };          /* (the decay runs on into the sustain, as an analog ADSR's does) */
 typedef struct { uint32_t cnt, pos, sounding, running, gidx; } arp_t;   /* gidx: the clock's step it played on */
@@ -60,6 +72,9 @@ typedef struct {
     int32_t acx, acy;                           /* (0.5) the VCF input's AC coupling: the last input, the output (Q8) */
     int32_t o[NJSRC];                           /* the outputs, volts (Q12), as they are now */
     int32_t cut_sm, res_sm, pw_sm, wave_sm, lw_sm;   /* the knobs, slewed (a CC's steps glide), Q8 */
+    int32_t sm8[NPARAM];                        /* (0.6.3) the other continuous knobs, gliding (SM_IDS), Q8 */
+    uint32_t sm_moving, sm_rr;                  /* (which of SM_IDS glide now; the next one looked at) */
+    int32_t pan8;                               /* (the mixer's pan, 0 .. 128, gliding, Q8) */
     int32_t drift[2];                           /* the analog wander: the VCO, the VCF */
     int32_t amp;                                /* the VCA's gain at the last sample, Q15 (the screen) */
 } track_t;
@@ -81,6 +96,8 @@ static volatile uint32_t ctl_clk_ext;           /* (0.4.1) GLOBAL > CLOCK is USB
 static volatile uint32_t ui_lfo_inc[NTRK];       /* the LFO's step a sample (the screen: a fast LFO's light lit steady) */
 static volatile uint8_t ctl_lvl[NTRK];          /* the mixer: level 0..127 (100 = unity; set by the app) */
 static volatile int8_t ctl_pan[NTRK];           /* -64..64 */
+static volatile uint8_t ctl_snap[NTRK];         /* (0.6.3) a program loaded: its knobs at once, not gliding */
+static int32_t tune_sm;                         /* (0.6.3) ctl_tune8 gliding, Q16 (the ISR's) */
 
 /* the UI's view (the ISR writes) */
 static volatile uint8_t ui_note[NTRK];          /* the sounding note, 255: none (engine_init) */
@@ -355,7 +372,9 @@ static void arp_tick(track_t *t)
  * level waits, or does nothing) */
 static void eg_tick(track_t *t, const uint8_t *pv, int gate, int trig)
 {
-    int32_t sus = (int32_t)SUS_Q15[pv[P_SUSTAIN] & 127u] * (ENV_ONE >> 15);   /* (0.5: its curve, KNOB) */
+#define F_SUS(x) ((int32_t)SUS_Q15[(x) & 127])
+    int32_t sus = SM_F(t->sm8[P_SUSTAIN], 127, F_SUS) * (ENV_ONE >> 15);   /* (0.5: its curve, KNOB; 0.6.3: gliding) */
+    (void)pv;
     if (trig || (gate && (t->eg_stage == E_IDLE || t->eg_stage == E_REL))) {
         t->eg_hold = t->eg_stage == E_IDLE ? 0 : t->eg;
         t->eg_hold_dec = t->eg_stage == E_DEC || (t->eg_stage == E_ATT && t->eg_hold_dec);
@@ -401,17 +420,72 @@ static inline int32_t vcf_amt_q15(uint32_t v) { return VCF_AMT_Q15[v & 127u]; }
 /* (DUTY_MIN16, DUTY_SPAN16: PULSE WIDTH's ends, KNOB in tools/gen_tables.py) */
 #define DUTY_PER_V16 2949                       /* 4.5 % a volt */
 
+/* (0.6.3, the user) the continuous knobs that glide (more than 25 values: the user's rule): the levels, the amounts,
+ * PITCH, the fines, LFO RATE, the folder, SUSTAIN, the effects' (their owner track's). Not the times (ATTACK .. GLIDE,
+ * the gates: a rate, no step to hear), nor CUTOFF, RESONANCE, PULSE WIDTH, the waves (their own slews, above) */
+static const uint8_t SM_IDS[] = {P_PITCH, P_FINE, P_CUT_FINE, P_LFO_FINE, P_LFO_RATE, P_DRIFT, P_KB_SCALE, P_VCO_MIX,
+    P_VCF_MIX, P_PITCH_AMT, P_PWM_AMT, P_VCF_AMT, P_VOLUME, P_ATTN, P_ONE_LVL, P_FOLD, P_NOISE, P_SUSTAIN, P_CH_RATE,
+    P_CH_DEPTH, P_CH_MIX, P_DL_FB, P_DL_LOW, P_DL_HIGH, P_DL_SEND, P_DL_WIDTH, P_RV_DECAY, P_RV_DAMP, P_RV_DIFF,
+    P_RV_PRE, P_RV_SEND, P_RV_WIDTH};
+#define NSM (sizeof SM_IDS / sizeof SM_IDS[0])
+typedef char sm_ids_fit[NSM == 32u ? 1 : -1];   /* (a bit each in sm_moving; sm_rr wraps at 32) */
+/* a block of the glides: an eighth of the knobs looked at (a new value starts gliding ~3 ms late at most), the ones
+ * gliding stepped; a program loaded (ctl_snap): all at once */
+static void sm_snap(track_t *t, uint32_t ti)    /* a program loaded (ctl_snap): its knobs at once */
+{
+    const uint8_t *pv = t->p->v;
+    uint32_t i;
+    ctl_snap[ti] = 0;
+    for (i = 0; i < NSM; i++) t->sm8[SM_IDS[i]] = (int32_t)pv[SM_IDS[i]] << 8;
+    t->sm_moving = 0;
+    t->pan8 = (clampi(ctl_pan[ti], -64, 64) + 64) << 8;
+    t->cut_sm = (int32_t)pv[P_CUTOFF] << 8; t->res_sm = (int32_t)pv[P_RES] << 8; t->pw_sm = (int32_t)pv[P_PW] << 8;
+    t->wave_sm = (int32_t)pv[P_WAVE] << 8; t->lw_sm = (int32_t)pv[P_LFO_WAVE] << 8;   /* (their own slews too) */
+}
+static void sm_tick(track_t *t, uint32_t ti)
+{
+    const uint8_t *pv = t->p->v;
+    uint32_t i, m;
+    int32_t pan = (clampi(ctl_pan[ti], -64, 64) + 64) << 8;
+    if (ctl_snap[ti]) { sm_snap(t, ti); return; }
+    for (i = 0; i < NSM / 8u; i++) {
+        uint32_t k = t->sm_rr++ & 31u;
+        if (t->sm8[SM_IDS[k]] != (int32_t)pv[SM_IDS[k]] << 8) t->sm_moving |= 1u << k;
+    }
+    for (m = t->sm_moving, i = 0; m; m >>= 1, i++)
+        if (m & 1u) {
+            int32_t *s = &t->sm8[SM_IDS[i]], tg = (int32_t)pv[SM_IDS[i]] << 8;
+            *s = sm_to(*s, tg);
+            if (*s == tg) t->sm_moving &= ~(1u << i);
+        }
+    t->pan8 = sm_to(t->pan8, pan);
+}
+/* what the engine makes of a knob's value (SM_F's F) */
+#define F_KBS(x) (KBS_LO12 + (int32_t)(x) * KBS_SPAN12 / 127)
+#define F_LFOP8(x) ((int32_t)LFO_P8[(x) & 127])
+#define F_FINE8(x) fine8((uint32_t)(x))
+#define F_PITCH(x) ((int32_t)PITCH_P8[(uint32_t)(x) % 121u])
+#define F_FINE(x) (((int32_t)(x) - 50) * 256 / 100)
+#define F_LIN(x) lin_q15((uint32_t)(x))
+#define F_SQ(x) sq_q15((uint32_t)(x))
+#define F_VAMT(x) vcf_amt_q15((uint32_t)(x))
+#define F_FOLDG(x) (4096 + (int32_t)(x) * 161)
+#define F_PANL(x) (PAN_Q12[128 - (x)] * 2)
+#define F_PANR(x) (PAN_Q12[(x)] * 2)
+#define F_SEND(x) ((int32_t)(x) * 258)
+
 /* ---- one block (CTL frames) of a track, added into out (stereo). The patchbay a sample at a time */
 static int track_block(track_t *t, uint32_t ti, int32_t *out)
 {
     const uint8_t *pv = t->p->v;
     int32_t *o = t->o;
     uint32_t i, gate, lfo_inc = 0, nz_on;
-    int32_t kb8, kbcv, scl, p_base, c_base, deg, vco_mx, vcf_mx, pamt, wamt, famt, vol, attn, one, fg, gl, gr, pos, nlev;
+    int32_t kb8, kbcv, scl, p_base, c_base, deg, vco_mx, vcf_mx, pamt, wamt, famt, vol, attn, one, fg, gl, gr, nlev;
     int32_t lfo_p8, lw, ww, duty0;
     uint32_t woke;                              /* (0.5) back from idle this block */
     uint8_t jk[NJIN];
     for (i = 0; i < NJIN; i++) jk[i] = (uint8_t)(jack_ok(i, pv[PJ(i)]) ? pv[PJ(i)] : 0u);   /* (never its own output) */
+    sm_tick(t, ti);                             /* (0.6.3: the knobs gliding) */
     /* the keyboard: the glide (an RC lag), KB SCALE (1 .. 5 octaves an octave: the low C of the panel's keys is 0 V,
      * MIDI C4 here), the KB CV out */
     if (t->kb16 != t->target16) {
@@ -420,7 +494,7 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
         else t->kb16 += (int32_t)(((int64_t)diff * GLIDE_K[pv[P_GLIDE] & 127u]) >> 16);
     }
     kb8 = (t->kb16 >> 8) - 60 * 256;
-    scl = KBS_LO12 + (int32_t)pv[P_KB_SCALE] * KBS_SPAN12 / 127;   /* Q12 octaves (KNOB: 1 .. 5) */
+    scl = SM_F(t->sm8[P_KB_SCALE], 127, F_KBS);   /* Q12 octaves (KNOB: 1 .. 5) */
     kbcv = (((kb8 * 4) / 3) * scl) >> 12;       /* Q8 semitones -> volts (12 * 256 = 1 V = 4096) x KB SCALE */
     o[J_KBCV] = kbcv;
     /* the MIDI sources (not on the reference panel): 0 .. +5 V */
@@ -439,13 +513,14 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
     ui_env[ti] = t->eg >> 9;
     ui_estage[ti] = (uint8_t)t->eg_stage;
     /* the knobs, slewed */
-    t->cut_sm += (((int32_t)pv[P_CUTOFF] << 8) - t->cut_sm) >> 3;
-    t->res_sm += (((int32_t)pv[P_RES] << 8) - t->res_sm) >> 3;
-    t->pw_sm += (((int32_t)pv[P_PW] << 8) - t->pw_sm) >> 3;
-    t->wave_sm += (((int32_t)pv[P_WAVE] << 8) - t->wave_sm) >> 3;
-    t->lw_sm += (((int32_t)pv[P_LFO_WAVE] << 8) - t->lw_sm) >> 3;
+    t->cut_sm = sm_to(t->cut_sm, (int32_t)pv[P_CUTOFF] << 8);   /* (0.6.3: as the others, and there exactly) */
+    t->res_sm = sm_to(t->res_sm, (int32_t)pv[P_RES] << 8);
+    t->pw_sm = sm_to(t->pw_sm, (int32_t)pv[P_PW] << 8);
+    t->wave_sm = sm_to(t->wave_sm, (int32_t)pv[P_WAVE] << 8);
+    t->lw_sm = sm_to(t->lw_sm, (int32_t)pv[P_LFO_WAVE] << 8);
     /* the LFO: its rate a pitch (LFO_P8), the LFO RATE input 1 V an octave */
-    lfo_p8 = LFO_P8[pv[P_LFO_RATE] & 127u] + fine8(pv[P_LFO_FINE]);   /* (0.5: RATE FINE, +-2 semitones) */
+    lfo_p8 = SM_F(t->sm8[P_LFO_RATE], 127, F_LFOP8) + SM_F(t->sm8[P_LFO_FINE], 127, F_FINE8);   /* (0.5: RATE FINE,
+                                                 * +-2 semitones) */
     if (!jk[I_LFORATE]) lfo_inc = pitch_inc(lfo_p8);
     if (pv[P_LFO_SYNC]) {                       /* (0.3) SYNC: a note value of the clock, its phase the clock's place */
         uint32_t tk = DIV_TICKS((pv[P_LFO_SYNC] - 1u) % NCLKDIV), inc = (clk_adv << 12) / (tk * CTL);
@@ -471,31 +546,32 @@ static int track_block(track_t *t, uint32_t ti, int32_t *out)
     ui_note[ti] = t->note;
     /* the pitch: PITCH (+-5 octaves), FINE, the keyboard's CV, the bend, the tune, the wander; per sample: 1V/OCT and
      * the VCO MOD */
-    deg = (t->drift[0] * pv[P_DRIFT]) >> 13;
-    p_base = 60 * 256 + PITCH_P8[pv[P_PITCH] % 121u] + ((int32_t)pv[P_FINE] - 50) * 256 / 100 + ((kbcv * 3) >> 2)
-           + (ctl_bend[ti] * (int32_t)pv[P_BEND] * 256 >> 13) + ctl_tune8 + deg;
-    vco_mx = lin_q15(pv[P_VCO_MIX]);            /* EG (0) .. LFO (32767) */
-    vcf_mx = lin_q15(pv[P_VCF_MIX]);
-    pamt = sq_q15(pv[P_PITCH_AMT]);             /* full: 1 V an octave of the mix */
-    wamt = lin_q15(pv[P_PWM_AMT]);              /* full: 4.5 % a volt of the mix (as the PWM jack) */
-    famt = vcf_amt_q15(pv[P_VCF_AMT]);           /* full: 1 V an octave of the mix (EG at its top: +8 octaves) */
+#define F_DEG0(x) ((t->drift[0] * (int32_t)(x)) >> 13)
+#define F_DEG1(x) ((t->drift[1] * (int32_t)(x)) >> 11)
+    deg = SM_F(t->sm8[P_DRIFT], 127, F_DEG0);
+    p_base = 60 * 256 + SM_F(t->sm8[P_PITCH], 120, F_PITCH) + SM_F(t->sm8[P_FINE], 100, F_FINE) + ((kbcv * 3) >> 2)
+           + (ctl_bend[ti] * (int32_t)pv[P_BEND] * 256 >> 13) + (tune_sm >> 8) + deg;
+    vco_mx = SM_F(t->sm8[P_VCO_MIX], 127, F_LIN);   /* EG (0) .. LFO (32767) */
+    vcf_mx = SM_F(t->sm8[P_VCF_MIX], 127, F_LIN);
+    pamt = SM_F(t->sm8[P_PITCH_AMT], 127, F_SQ);   /* full: 1 V an octave of the mix */
+    wamt = SM_F(t->sm8[P_PWM_AMT], 127, F_LIN);    /* full: 4.5 % a volt of the mix (as the PWM jack) */
+    famt = SM_F(t->sm8[P_VCF_AMT], 127, F_VAMT);   /* full: 1 V an octave of the mix (EG at its top: +8 octaves) */
     ww = (t->wave_sm * 258) >> 8;
     duty0 = DUTY_MIN16 + t->pw_sm * DUTY_SPAN16 / (127 * 256);
     /* the cutoff: 30 Hz .. 20 kHz over the knob, the wander */
     {                                           /* (the slewed knob, between two of the table's steps) */
         int32_t ci = clampi(t->cut_sm >> 8, 0, 127), cf = t->cut_sm & 255;
-        c_base = CUT_P8[ci] + (((CUT_P8[ci + 1] - CUT_P8[ci]) * cf) >> 8) + ((t->drift[1] * pv[P_DRIFT]) >> 11)
-               + fine8(pv[P_CUT_FINE]);   /* (0.5: the fine, +-2 semitones) */
+        c_base = CUT_P8[ci] + (((CUT_P8[ci + 1] - CUT_P8[ci]) * cf) >> 8) + SM_F(t->sm8[P_DRIFT], 127, F_DEG1)
+               + SM_F(t->sm8[P_CUT_FINE], 127, F_FINE8);   /* (0.5: the fine, +-2 semitones) */
     }
-    vol = sq_q15(pv[P_VOLUME]);                 /* (a log pot) */
-    attn = lin_q15(pv[P_ATTN]);
-    one = lin_q15(pv[P_ONE_LVL]);
-    fg = 4096 + (int32_t)pv[P_FOLD] * 161;      /* the folder's gain, Q12: 1 .. 6 (three folds of a 5 V wave) */
-    nlev = lin_q15(pv[P_NOISE]);                /* (0.3.2) the noise into the VCF: +-5 V at the top */
+    vol = SM_F(t->sm8[P_VOLUME], 127, F_SQ);    /* (a log pot) */
+    attn = SM_F(t->sm8[P_ATTN], 127, F_LIN);
+    one = SM_F(t->sm8[P_ONE_LVL], 127, F_LIN);
+    fg = SM_F(t->sm8[P_FOLD], 127, F_FOLDG);    /* the folder's gain, Q12: 1 .. 6 (three folds of a 5 V wave) */
+    nlev = SM_F(t->sm8[P_NOISE], 127, F_LIN);   /* (0.3.2) the noise into the VCF: +-5 V at the top */
     for (i = 0, nz_on = nlev != 0; i < NJIN; i++) nz_on |= jk[i] == J_NOISE;   /* (it runs only when heard) */
-    pos = clampi(ctl_pan[ti], -64, 64) + 64;    /* (the track's pan, from the mixer; x 2: the middle is +3 dB, 5 V out of
-                                                 * the VCA ~-1 dBFS) */
-    gl = PAN_Q12[128 - pos] * 2; gr = PAN_Q12[pos] * 2;
+    /* the track's pan, from the mixer, gliding (0.6.3); x 2: the middle is +3 dB, 5 V out of the VCA ~-1 dBFS */
+    gl = SM_F(t->pan8, 128, F_PANL); gr = SM_F(t->pan8, 128, F_PANR);
     /* (0.5) the hardware's ladder is never quite silent (its transistors' noise): with RESONANCE past the singing
      * point it starts on its own, with nothing in it. Here a hiss of ~-90 dB into its first stage once a block (the
      * user: no white noise in the programs; 0.4.1's whistle took a breath of NOISE to start) */
@@ -614,12 +690,15 @@ static void engine_audio(int32_t *out, uint32_t n)
 {
     uint32_t b, i, ti, pk = 0, dl_fed = 0, rv_fed = 0;
     int32_t cm[NTRK];
-    const patch_t *pc = 0;
+    const track_t *pc = 0;                      /* (0.6.3: the owners, their knobs gliding) */
     static int32_t sc_prev;
     static uint32_t sc_i, sc_sub;
     int32_t tg[NTRK], dg[NTRK], dm[NTRK], rm[NTRK];
-    const patch_t *pd = 0, *pr = 0;
+    const track_t *pd = 0, *pr = 0;
+    uint32_t smv = 0;                           /* (0.6.3) the tracks whose knobs glided this half: their sends a block
+                                                 * at a time */
     if (!engine_ready) return;
+    for (ti = 0; ti < NTRK; ti++) if (ctl_snap[ti]) sm_snap(&trk[ti], ti);   /* (a program loaded: before its sends) */
     for (i = 0; i < 2u * n; i++) mbus[i] = dsend[i] = 0;
     for (i = 0; i < n; i++) rsend[i] = csend[i] = 0;
     for (ti = 0; ti < NTRK; ti++) {             /* the chorus, the delay, the reverb: one each, shared (the first track
@@ -627,12 +706,13 @@ static void engine_audio(int32_t *out, uint32_t n)
                                                  * each sound's sends (Q15) */
         const uint8_t *v = trk[ti].p->v;
         uint32_t on = !ctl_fx_off;              /* (0.3: REC off: every effect off, the sounds' switches as they are) */
-        if (!pc && on && v[P_CH_ON]) pc = trk[ti].p;
-        if (!pd && on && v[P_DL_ON]) pd = trk[ti].p;
-        if (!pr && on && v[P_RV_ON]) pr = trk[ti].p;
-        dm[ti] = on && v[P_DL_ON] ? v[P_DL_SEND] * 258 : 0;
-        rm[ti] = on && v[P_RV_ON] ? v[P_RV_SEND] * 258 : 0;
-        cm[ti] = on && v[P_CH_ON] ? v[P_CH_MIX] * 258 : 0;
+        if (!pc && on && v[P_CH_ON]) pc = &trk[ti];
+        if (!pd && on && v[P_DL_ON]) pd = &trk[ti];
+        if (!pr && on && v[P_RV_ON]) pr = &trk[ti];
+        dm[ti] = on && v[P_DL_ON] ? SM_F(trk[ti].sm8[P_DL_SEND], 127, F_SEND) : 0;   /* (0.6.3: gliding; a block at a
+                                                 * time below while a knob glides) */
+        rm[ti] = on && v[P_RV_ON] ? SM_F(trk[ti].sm8[P_RV_SEND], 127, F_SEND) : 0;
+        cm[ti] = on && v[P_CH_ON] ? SM_F(trk[ti].sm8[P_CH_MIX], 127, F_SEND) : 0;
     }
     for (ti = 0; ti < NTRK; ti++) {             /* the mixer's level, gliding over the half (no zipper) */
         tg[ti] = (int32_t)(ctl_lvl[ti] * ctl_lvl[ti] * 4096u / 10000u);
@@ -642,6 +722,7 @@ static void engine_audio(int32_t *out, uint32_t n)
         engine_events();
         eng_t += CTL;
         clock_block();
+        tune_sm = sm_to(tune_sm, ctl_tune8 << 8);   /* (0.6.3: TUNE glides) */
         if (ctl_arp_restart) {                  /* MIDI start: the arps from the top */
             ctl_arp_restart = 0;
             for (ti = 0; ti < NTRK; ti++) { trk[ti].arp.pos = 0; trk[ti].arp.cnt = 0xFFFFFFFFu; }
@@ -652,6 +733,13 @@ static void engine_audio(int32_t *out, uint32_t n)
             for (i = 0; i < 2u * CTL; i++) tbus[i] = 0;
             if (track_block(&trk[ti], ti, tbus)) {
                 int32_t g = lvl_g[ti] * 16 + dg[ti] * (int32_t)b;
+                int32_t ds = dm[ti], rs = rm[ti], cs = cm[ti];
+                if (trk[ti].sm_moving) smv |= 1u << ti;
+                if (smv >> ti & 1u) {           /* (the sends, gliding: a block at a time; else the half's) */
+                    const int32_t *s8 = trk[ti].sm8;
+                    ds = ds ? SM_F(s8[P_DL_SEND], 127, F_SEND) : 0; rs = rs ? SM_F(s8[P_RV_SEND], 127, F_SEND) : 0;
+                    cs = cs ? SM_F(s8[P_CH_MIX], 127, F_SEND) : 0;
+                }
 #ifdef OBV_HOST
                 host_blocks[ti]++;
 #endif
@@ -660,9 +748,9 @@ static void engine_audio(int32_t *out, uint32_t n)
                     int32_t l = (clampi(tbus[2u * i], -262143, 262143) * gg) >> 12, r = (clampi(tbus[2u * i + 1u], -262143, 262143) * gg) >> 12;
                     int32_t al = l < 0 ? -l : l, ar = r < 0 ? -r : r;
                     mbus[2u * (b + i)] += l; mbus[2u * (b + i) + 1u] += r;
-                    if (dm[ti]) { dsend[2u * (b + i)] += ((l >> 2) * (dm[ti] >> 3)) >> 10; dsend[2u * (b + i) + 1u] += ((r >> 2) * (dm[ti] >> 3)) >> 10; dl_fed = 1; }
-                    if (rm[ti]) { rsend[b + i] += ((((l + r) >> 1) >> 2) * (rm[ti] >> 3)) >> 10; rv_fed = 1; }
-                    if (cm[ti]) csend[b + i] += ((((l + r) >> 1) >> 2) * (cm[ti] >> 3)) >> 10;
+                    if (ds) { dsend[2u * (b + i)] += ((l >> 2) * (ds >> 3)) >> 10; dsend[2u * (b + i) + 1u] += ((r >> 2) * (ds >> 3)) >> 10; dl_fed = 1; }
+                    if (rs) { rsend[b + i] += ((((l + r) >> 1) >> 2) * (rs >> 3)) >> 10; rv_fed = 1; }
+                    if (cs) csend[b + i] += ((((l + r) >> 1) >> 2) * (cs >> 3)) >> 10;
                     if ((uint32_t)al > tp) tp = (uint32_t)al;
                     if ((uint32_t)ar > tp) tp = (uint32_t)ar;
                 }
@@ -677,8 +765,8 @@ static void engine_audio(int32_t *out, uint32_t n)
     else if (!dl_fed && !dl_live) { if (fxs.dl_on && dl_clr < DLY_MAX) dl_dirty = 1; pd = 0; }
     if (!pr) { if (fxs.rv_on) rv_dirty = 1; rv_live = 0; }
     else if (!rv_fed && !rv_live) pr = 0;
-    chs_block(pc);
-    fxs_block(pd, pr, quarter_len());
+    chs_block(pc ? pc->p : 0, pc ? pc->sm8 : 0);
+    fxs_block(pd ? pd->p : 0, pd ? pd->sm8 : 0, pr ? pr->p : 0, pr ? pr->sm8 : 0, quarter_len());
     fxs_process(mbus, csend, dsend, rsend, n);
     for (i = 0; i < 2u * n; i++) {              /* a DC blocker (~7 Hz): the pulse's offset, a driven filter. Its state in
                                                  * Q8, so the leak never stalls on a rounding (a dead band) */
@@ -742,6 +830,7 @@ static void engine_init(void)
         t->note = 60;
         t->kb16 = t->target16 = 60 << 16;
         t->lc_key = -1;
+        ctl_snap[ti] = 1;                       /* (0.6.3: the first block takes the knobs as they are) */
         t->nrnd = 0x2545F491u * (ti + 1u);      /* (never 0: xorshift stays at 0) */
         ui_note[ti] = 255;
     }

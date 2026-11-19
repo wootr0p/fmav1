@@ -294,6 +294,7 @@ typedef struct {
     const char *label, *top, *bot;              /* (a toggle: its positions' names) */
     char value[16];
     int32_t v, max, bip, present;
+    int32_t ang16;                              /* (0.6.3) the pointer's angle as drawn, 1/16 degree (gliding to v's) */
     uint8_t style, icl, icr;                    /* the signs at the scale's ends */
     uint8_t badge;                              /* (0.5.2) REC held: 1 its MIDI CC (cc), 2 none; (0.6, the user) a
                                                  * badge over the knob, its value left in view */
@@ -344,7 +345,8 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
         knob_badge(cx, cy + 2, kv, acc);
         return;
     }
-    ang = 240 - (kv->max ? 300 * kv->v / kv->max : 0);   /* (0.5: the reference panel turns 7 to 5 o clock, 300 degrees) */
+    ang = kv->ang16 / 16;                       /* (0.5: the reference panel turns 7 to 5 o clock, 300 degrees; 0.6.3: as
+                                                 * drawn, gliding: knob_view) */
     if (kv->style == KS_BIG)                    /* a big knob: a dense ring of fine ticks, as the panel's */
         for (i = 0; i <= 30; i++) {             /* (every 10 degrees; the clock hours long) */
             int32_t d = (240 - 10 * i) * 16;
@@ -368,8 +370,8 @@ static void ui_knob_at(int32_t x0, int32_t y0, const knob_view_t *kv, uint16_t a
     cv_disc_g(cx, cy, 14, RGB(70, 70, 74), RGB(14, 14, 15));
     cv_disc_g(cx, cy, 12, RGB(34, 34, 36), RGB(6, 6, 7));
     cv_disc_g(cx - 3, cy - 4, 4, RGB(64, 64, 68), RGB(34, 34, 36));
-    knob_xy(cx, cy, 2, ang * 16, &px, &py);
-    knob_xy(cx, cy, 13, ang * 16, &qx, &qy);
+    knob_xy(cx, cy, 2, kv->ang16, &px, &py);
+    knob_xy(cx, cy, 13, kv->ang16, &qx, &qy);
     cv_wu2(px, py, qx, qy, C_INK);
     if (kv->icl) cv_icon(cx - 25, cy + 16, kv->icl, C_INK2);
     if (kv->icr) cv_icon(cx + 17, cy + 16, kv->icr, C_INK2);
