@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.6.4 (2026-11-20)
+
+- Screen reader: a section's button held reads its page's knobs by name only, no values ("1 RATE, 2 WAVE, 3
+  SYNCHRONIZATION, 4 RATE FINE"; HOME's mixer: PLAYING after a track that sounds). A value: REC held and its knob
+  turned.
+- Screen reader: a knob with nothing on it (an empty place on the page) says "NOT ASSIGNED" at every turn.
+- Screen reader: the FM-1's own voice on at power-on says the firmware and its version during the start-up picture,
+  "F MAV ONE VERSION 0 POINT 6 POINT 4", then the program and the page.
+- Screen reader: SELECT turned says the page at once, at every detent (it waited for the turn to stop); at the first
+  or the last page, turned on, again.
+- The FM-1's own voice at power-on: the program and the page wait for "F MAV ONE VERSION ..." to end (they cut its
+  last words, and a knob turned cut it all). A warning (kept whole) is no longer cut in its last sounds either.
+- Screen reader, the patchbay: the inputs' pages are "INPUTS" alone ("2 OF 4. INPUTS", not "INPUTS 1 TO 4"); a cable
+  is "LINKED TO" its input ("LFO LINKED TO 1 VOLT PER OCTAVE", "NO CABLE LINKED TO FOLD IN"), on its knob and in the
+  patchbay's overview.
+- Screen reader: REC held says the track and the page first: "CURRENT TRACK 2, CURRENT PAGE 1 OF 2. OSCILLATOR. TURN
+  A KNOB TO KNOW ITS VALUE".
+- Screen reader: a patch cable's knob says the whole phrase at every turn, not only the first: "LFO TO FOLD IN", "VCO
+  TO FOLD IN", "NO CABLE TO S H NORMALIZED TO V C O" (the other knobs with few values: their value alone).
+- The FM-1's own voice turned on (PLAY held 2 s) says how to use it instead of the page: "SCREEN READER ON", a longer
+  pause, "PRESS AND HOLD ANY PAGE NAVIGATION BUTTON TO KNOW THE PARAMETERS CORRESPONDING TO KNOBS 1, 2, 3, AND 4.
+  PRESS AND HOLD THE LAST BUTTON ON THE SECOND ROW TO SAY THE CURRENT PAGE, AND LISTEN TO THE ON-SCREEN VALUE OF A
+  PARAMETER WHILE ADJUSTING THE CORRESPONDING KNOB. HAVE FUN WITH F MAV ONE!" (a button or a knob cuts it short).
+- Screen reader: REC held, a continuous knob said its name twice (on the touch, then with its value): once now.
+- Screen reader: after a second with no knob turned, the next turn says the knob's name again, the same knob too (a
+  knob with few values: its name and value).
+- Screen reader: REC held, a knob with few values says its name and its value at every turn ("DELAY ON"), as a
+  continuous knob does with REC held.
+- Screen reader: the patchbay's DUMMY is said "DUMMY CABLE", always ("DUMMY CABLE TO FOLD IN"); the screen keeps DUMMY.
+- The FM-1's own voice: SPEED 6 at first (it was 4), on a first install or after a memory reset; saved settings keep
+  their SPEED.
+- The Firmware Hub's description, shorter: "... 90 sounds. Made for blind players too."
+
 ## 0.6.3 (2026-11-19)
 
 - Screen reader: **OCT- / OCT+ say the octave** again, as their light shows it, the number first: "PLUS 2 OCTAVE"

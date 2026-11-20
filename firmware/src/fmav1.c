@@ -1313,6 +1313,8 @@ static void trk_select(uint32_t t)              /* ALGORITHM (several tracks): t
 static void sp_knob_change(int32_t id, int32_t was, uint32_t fresh);   /* (mfm_speak.h) */
 static void sp_hush(void);
 static void sp_knob_touch(uint32_t k, int32_t id);
+static void sp_not_assigned(void);
+static void sp_select_page(void);
 static uint32_t sp_turn_t, sp_in_enc;           /* (0.6) mfm_speak.h: an encoder turned last then; turning now */
 static void encoders_(void);
 static void encoders(void)                      /* (0.6: what a turn makes the screen say waits until it stops) */
@@ -1346,15 +1348,18 @@ static void encoders_(void)
             }
         }
     }
-    if ((e = fm1_enc_take(ENC_SELECT)) != 0) { sp_turn_t = fm1_ms; page_step(e, 0); }  /* SELECT: every page of the section, stopping at the ends */
+    if ((e = fm1_enc_take(ENC_SELECT)) != 0) {   /* SELECT: every page of the section, stopping at the ends */
+        sp_turn_t = fm1_ms; page_step(e, 0);
+        sp_select_page();                       /* (0.6.4, the user: the page said at once, every detent) */
+    }
     for (k = 0; k < 4u; k++)
         if ((e = fm1_enc_take(ENC_KNOB1 + k)) != 0) {
             int32_t id = page_param(k);
             uint32_t fresh = fm1_ms - sp_turn_t >= 500u;   /* (a new turn, not the same one going on) */
             sp_turn_t = fm1_ms;
             if (fresh) sp_hush();                /* (0.6, the user: a knob turned, the page's reading stops) */
-            if (id < 0) continue;
             sp_knob_touch(k, id);               /* (0.6, the user: the first on the page, or another: its name) */
+            if (id < 0) { sp_not_assigned(); continue; }   /* (0.6.4, the user: nothing on it, said every turn) */
             if (id == V_TEMPO && set.clk_src != CLK_INT) {   /* (0.4.1) locked: the outside clock sets it */
                 warn(set.clk_src == CLK_USB ? "TEMPO NOT CHANGED|THE USB CLOCK SETS IT" : "TEMPO NOT CHANGED|THE TRS CLOCK SETS IT");
                 continue;
@@ -1381,7 +1386,8 @@ static void encoders_(void)
 static void voice_toggle(void)
 {
     if (set.voice) { say("SCREEN READER OFF"); set.voice = 0; }
-    else { set.voice = 1; say("SCREEN READER ON"); sp.started = 0; sp.where_soft = 1; }
+    else { set.voice = 1; say("SCREEN READER ON"); sp_intro(); sp.started = 0; sp.where_soft = 1; }   /* (0.6.4, the
+                                                 * user: then how to use it, not the page) */
     set_dirty = 1; set_t = fm1_ms;
 }
 /* (0.6) the voice's VOLUME (HOME > READER, 0..10: 8 the level it had) on the MASTER knob's, Q12 */
@@ -1507,8 +1513,9 @@ static void settings_fix(void)
     if (!set.kvel || set.kvel > 127u) set.kvel = 100;
     if (set.lights > 11u) set.lights = 0;
     if (set.vo_set != 2u || set.vo_vol > 10u || set.vo_speed >= VO_NRATE || set.vo_pitch >= VO_NPITCH) {   /* (0.6) the
-                                                 * voice's (vo_set 2: SPEED 1..9, the user; 4 at first: 130 %) */
-        set.vo_set = 2; set.vo_vol = 8; set.vo_speed = 3; set.vo_pitch = 3;
+                                                 * voice's (vo_set 2: SPEED 1..9, the user; 6 at first, 80 %: 0.6.4,
+                                                 * the user; saved settings keep theirs) */
+        set.vo_set = 2; set.vo_vol = 8; set.vo_speed = 5; set.vo_pitch = 3;
     }
     vo_settings(set.vo_speed, set.vo_pitch);
     if (set.vo_out > VO_OUT_USB) set.vo_out = VO_OUT_MAIN;
@@ -1605,6 +1612,10 @@ static void app_main(void)
     for (i = 0; i < NTRK; i++) trk_load(i, set.tprog[i]);
     set_dirty = 0;
     layer_btn = 0xFFu;
+#ifdef OBV_HOST
+    if (getenv("FMAV1_VOICE_ON")) set.voice = 1;   /* (the simulator: power on with the voice on, tests/run_tests.sh) */
+#endif
+    if (set.voice) sp_boot();                   /* (0.6.4, the user: the version, said while the splash runs) */
     ui_splash();
     scope_state = 1;
     idle_ok = 1;
@@ -1615,7 +1626,7 @@ static void app_main(void)
         buttons();
         if (rec_down && !cc_view && fm1_ms - rec_t >= REC_HOLD_MS) {   /* (0.5.2) REC held: the CCs shown */
             cc_view = 1; dirty_page = 1;
-            sp_tell("TURN A KNOB TO KNOW ITS VALUE");   /* (0.6, the user: said, not shown) */
+            sp_rec_held();                      /* (0.6, the user: said, not shown; 0.6.4: the page first) */
         }
         if (play_down && !play_used && fm1_ms - play_t >= 2000u) { play_used = 1; voice_toggle(); }   /* (0.6) */
         if (secb_btn != 0xFFu && !secb_used && fm1_ms - secb_t >= REC_HOLD_MS && !(secb_btn == BTN_EDIT && edit_used)) {

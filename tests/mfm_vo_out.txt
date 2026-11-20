@@ -51,4 +51,46 @@
 25800 said OUTPUT MAIN
 28000 btn 7
 28300 said 1 OF 2. FILTER
-30000 end
+# (0.6.4, the user) a knob with nothing on it: NOT ASSIGNED, as a name (HOME > VOICE: knobs 3 and 4 empty)
+29000 btn 8
+29100 btn 8
+29200 btn 8
+29600 said 3 OF 6. VOICE
+30000 enc 4 1
+30300 said NOT ASSIGNED
+30500 enc 4 1
+30800 said NOT ASSIGNED
+31000 enc 5 1
+31300 said NOT ASSIGNED
+# (0.6.4, the user) SELECT turned: the page at once (before a knob's 0.5 s settle), every detent; at the last, again
+31500 btn 4
+32000 enc 0 1
+32050 said 2 OF 2.
+32300 enc 0 1
+32350 said 2 OF 2.
+32600 enc 0 -1
+32650 said 1 OF 2.
+# (0.6.4, the user) REC held: a discrete knob says its name and value at every turn ("DELAY ON", not "ON")
+33000 btn 2
+33500 btndown 13
+34200 enc 2 -1
+34250 said DELAY OFF
+34600 enc 2 1
+34650 said DELAY ON
+35000 btnup 13
+# (0.6.4, the user) a second with no knob turned: the same knob says its name again (a switch: with its value)
+35200 enc 2 -1
+35250 said OFF
+36500 enc 2 1
+36550 said DELAY ON
+36800 enc 3 1
+36850 said SEND
+# (0.6.4, the user's bug) REC held, a continuous knob turned: its name once, with its value (not on the touch too)
+37000 btn 6
+37500 btndown 13
+38100 said CURRENT TRACK 1, CURRENT PAGE 1 OF 2. OSCILLATOR. TURN A KNOB TO KNOW ITS VALUE
+38200 enc 2 1
+38250 said_none
+38900 said PITCH
+39100 btnup 13
+39500 end

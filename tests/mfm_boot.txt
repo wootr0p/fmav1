@@ -1,0 +1,7 @@
+# (0.6.4, the user) power-on with the FM-1's own voice on (FMAV1_VOICE_ON=1): during the splash it says the firmware
+# and its version ("F MAV ONE VERSION 0 POINT 6 POINT 4"; the simulator's version is "dev": the name only), then the
+# program and the page, after it (tests/run_tests.sh checks the WAV speaks during the splash)
+# (0.6.4, the user) never cut: not by the program and the page, nor by a knob turned meanwhile (FMAV1_VOICE_CUTS)
+1000 enc 2 1
+2050 listen
+2300 end

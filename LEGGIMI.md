@@ -18,6 +18,41 @@ Identità del firmware: `FM-1_3628` (F-M-A-V sulla tastiera del telefono). SHA-2
 > altri apparecchi, alle orecchie o ai dati. Non è un prodotto di M-VAVE né di nessun costruttore di sintetizzatori, e
 > non ne contiene codice, suoni o grafica. Vedi `LICENSE` (GPL-3.0) e `DISCLAIMER.md`.
 
+## Novità della 0.6.4
+
+- Lettore di schermo: un tasto di sezione tenuto premuto legge solo i nomi delle manopole della pagina, senza i valori
+  ("1 RATE, 2 WAVE, 3 SYNCHRONIZATION, 4 RATE FINE"; il mixer di HOME: PLAYING dopo una traccia che suona). Un valore:
+  REC tenuto e la sua manopola girata.
+- Lettore di schermo: una manopola senza niente sopra (un posto vuoto nella pagina) dice "NOT ASSIGNED" a ogni scatto.
+- Lettore di schermo: con la voce dell'FM-1 accesa, all'accensione dice il firmware e la sua versione durante
+  l'animazione di avvio, "F MAV ONE VERSION 0 POINT 6 POINT 4", poi il programma e la pagina.
+- Lettore di schermo: SELECT girato dice subito la pagina, a ogni scatto (prima aspettava che ti fermassi); alla
+  prima o all'ultima pagina, girato ancora, la ridice.
+- La voce dell'FM-1 all'accensione: il programma e la pagina aspettano che "F MAV ONE VERSION ..." finisca (ne
+  tagliavano le ultime parole). Anche un avviso non viene più tagliato negli ultimi suoni.
+- Lettore di schermo, il patchbay: le pagine degli ingressi si chiamano solo "INPUTS" ("2 OF 4. INPUTS", non "INPUTS 1
+  TO 4"); un cavo è "LINKED TO" il suo ingresso ("LFO LINKED TO 1 VOLT PER OCTAVE", "NO CABLE LINKED TO FOLD IN"),
+  sulla sua manopola e nella panoramica del patchbay.
+- Lettore di schermo: REC tenuto dice prima la traccia e la pagina: "CURRENT TRACK 2, CURRENT PAGE 1 OF 2. OSCILLATOR.
+  TURN A KNOB TO KNOW ITS VALUE".
+- Lettore di schermo: la manopola di un cavo dice la frase intera a ogni scatto, non solo al primo: "LFO TO FOLD IN",
+  "VCO TO FOLD IN", "NO CABLE TO S H NORMALIZED TO V C O" (le altre manopole con pochi valori: solo il valore).
+- La voce dell'FM-1 accesa (PLAY tenuto 2 s) spiega come usarla invece di leggere la pagina: "SCREEN READER ON", una
+  pausa più lunga, poi "PRESS AND HOLD ANY PAGE NAVIGATION BUTTON ..." (tenere un tasto di pagina: i parametri delle
+  manopole 1-4; tenere l'ultimo tasto della seconda fila, REC: la pagina e il valore di una manopola girata) e
+  "HAVE FUN WITH F MAV ONE!" (un tasto o una manopola la interrompono).
+- Lettore di schermo: con REC tenuto, una manopola continua diceva il nome due volte (al tocco e poi col valore):
+  ora una.
+- Lettore di schermo: dopo un secondo senza girare manopole, lo scatto dopo ridice il nome della manopola, anche se è
+  la stessa (una manopola con pochi valori: nome e valore).
+- Lettore di schermo: con REC tenuto, una manopola con pochi valori dice nome e valore a ogni scatto ("DELAY ON"),
+  come fa una manopola continua con REC tenuto.
+- Lettore di schermo: il DUMMY del patchbay si dice sempre "DUMMY CABLE" ("DUMMY CABLE TO FOLD IN"); sullo schermo
+  resta DUMMY.
+- La voce dell'FM-1: SPEED 6 all'inizio (era 4), alla prima installazione o dopo un reset della memoria; le
+  impostazioni già salvate tengono la loro SPEED.
+- La descrizione su The Firmware Hub, più corta: "... 90 sounds. Made for blind players too."
+
 ## Novità della 0.6.3
 
 - Lettore di schermo: **OCT- / OCT+ dicono di nuovo l'ottava**, come la mostra la loro luce, prima il numero: "PLUS 2

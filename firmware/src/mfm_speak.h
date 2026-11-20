@@ -98,7 +98,7 @@ static const char *const SP_WORDS[][2] = {
     {"VCO", "V C O"}, {"VCF", "V C F"}, {"VCA", "V C A"}, {"LFO", "L F O"}, {"PWM", "P W M"}, {"CV", "C V"},
     {"VELO", "VELOCITY"}, {"MODWHL", "MOD WHEEL"}, {"AFTERTC", "AFTERTOUCH"}, {"TRI", "TRIANGLE"}, {"USB", "U S B"},
     {"TRS", "T R S"}, {"FM", "F M"}, {"UFO", "U F O"}, {"PERC", "PERCUSSION"}, {"5TH", "FIFTH"}, {"2X", "2 TIMES"},
-    {"50/50", "50 50"}, {"CC", "C C"},
+    {"50/50", "50 50"}, {"CC", "C C"}, {"DUMMY", "DUMMY CABLE"},   /* (0.6.4, the user: always DUMMY CABLE) */
     {"ARP", "ARPEGGIATOR"}, {"BEND", "PITCH BEND"}, {"ANALOG", "ANALOG EFFECT"}, {"TUNE", "GLOBAL TUNE"},
     {"GLIDE", "PORTAMENTO"}, {"SYNC", "SYNCHRONIZATION"},   /* (the user) */ {"kHz", "KILOHERTZ"}, {"Hz", "HERTZ"}, {"ms", "MILLISECONDS"}, {"st", "SEMITONES"},
     {"s", "SECONDS"}, {"c", "CENTS"},
@@ -241,7 +241,7 @@ static void sp_knob(int32_t id, int32_t v, const char *title)
                 sp_cat(t);
             } else sp_cat("NO CABLE");
         } else sp_cat(JSRC_NAME[(uint32_t)v % NJSRC]);
-        sp_cat(" TO "); sp_jack_name(id, title, !v);
+        sp_cat(" LINKED TO "); sp_jack_name(id, title, !v);   /* (0.6.4, the user: LINKED TO, clearer than TO) */
         return;
     }
     sp_name(id, title); sp_cat(" "); sp_value(id, v, title);
@@ -256,7 +256,7 @@ static void sp_patchbay(void)                   /* the whole patchbay's cables, 
         uint32_t s = live.v[id];
         if (!s || !jack_ok((uint32_t)PB_ORDER[i], s)) continue;
         if (n++) sp_cat(", ");
-        sp_cat(JSRC_NAME[s % NJSRC]); sp_cat(" TO "); sp_jack_name(id, 0, 0);   /* (0.6.2: "LFO TO S+H") */
+        sp_cat(JSRC_NAME[s % NJSRC]); sp_cat(" LINKED TO "); sp_jack_name(id, 0, 0);   /* ("LFO LINKED TO S+H") */
     }
     if (!n) sp_cat("NO CABLES");
 }
@@ -281,11 +281,18 @@ static void sp_title(void)                      /* the page's title: "1 OF 2. VC
                                                  * the VCF's pages so, alone) */
     if (on_patchbay() || sec == S_FX || sec == S_ARP || sec == S_EDIT || sec == S_VCF) sub = 0;   /* (the user: an
                                                  * effect's or the arp's title without its ON / OFF or mode) */
+    {                                           /* (0.6.4, the user) the inputs' pages: "INPUTS" alone, not "INPUTS 1 TO
+                                                 * 4" (too many TO with the cables) */
+        const char *a = it->title, *b = "INPUTS";
+        while (*a && *a == *b) { a++; b++; }
+        if (!*a && !*b) sub = 0;
+    }
     if (sub && sub[0]) { sp_cat(sec == S_LFO ? ", " : " "); sp_cat(sub); }   /* ("LFO, TRS CLOCK"; "VCF LADDER") */
 }
-/* the page's knobs: their names (values: every value; else only a switch's); REC held: their CCs. The whole
- * patchbay: its cables */
-static void sp_knobs(int values)
+/* the page's knobs: their names ("DELAY SWITCH", an input without its normal); held (its button: 0.6.4, the user,
+ * no values: they are said turning a knob with REC held) a mixer's track that sounds PLAYING. The whole patchbay: its
+ * cables */
+static void sp_knobs(int held)
 {
     const item_t *it = cur_item();
     uint32_t k, any = 0;
@@ -295,17 +302,14 @@ static void sp_knobs(int values)
         if (id < 0) continue;
         if (any++) sp_cat(", ");
         sp_num(k + 1u); sp_cat(" ");               /* (0.6, the user: the knob's number first, "1 CUTOFF, 2 RESONANCE") */
-        if (values) {
-            sp_knob(id, pget(id), it->title);
-            /* (the user) a track whose meter shows (it sounds, through its level): PLAYING */
-            if ((id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK && g_trk_h((uint32_t)(id - V_LVL1)))
-                || (id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK && g_trk_h((uint32_t)(id - V_PAN1))))
-                sp_cat(" PLAYING");
-        }
-        else if (sp_switch(id)) { sp_name(id, 0); sp_cat(" SWITCH"); }   /* (a switch: its whole name, "VCA MODE") */
+        if (sp_switch(id)) { sp_name(id, 0); sp_cat(" SWITCH"); }   /* (a switch: its whole name, "VCA MODE") */
         else if (is_jack(id)) sp_jack_name(id, it->title, 0);   /* (0.6.2: "S+H"; its normal with NO CABLE) */
         else { sp_name(id, it->title); }   /* ("RESONANCE"; the user: "DELAY
                                                  * SWITCH", its state in the title, "DELAY OFF") */
+        /* (the user) held: a track whose meter shows (it sounds, through its level): PLAYING */
+        if (held && ((id >= V_LVL1 && id < V_LVL1 + (int32_t)NTRK && g_trk_h((uint32_t)(id - V_LVL1)))
+                     || (id >= V_PAN1 && id < V_PAN1 + (int32_t)NTRK && g_trk_h((uint32_t)(id - V_PAN1)))))
+            sp_cat(" PLAYING");
     }
 }
 static void sp_prog(uint32_t n, const uint8_t *name)   /* "PROGRAM 3 CLASSIC BASS" */
@@ -349,8 +353,10 @@ static void sp_knob_change(int32_t id, int32_t was, uint32_t fresh)
     if (!sp_on()) return;
     sp_n = 0;
     if (sp_discrete(id)) {                      /* (0.6.2, the user) the value only; just touched: its name first,
-                                                 * once ("OUTPUT U S B", then "MAIN") */
-        if (touched) sp_knob(id, v, 0); else sp_value(id, v, 0);
+                                                 * once ("OUTPUT U S B", then "MAIN"). A cable (0.6.4, the user: clearer)
+                                                 * always the whole phrase: "LFO TO FOLD IN", "VCO TO FOLD IN"; REC held
+                                                 * (0.6.4, the user) its name and value, as a continuous knob's */
+        if (touched || is_jack(id) || rec_down) sp_knob(id, v, 0); else sp_value(id, v, 0);
         sp_send(sp_out(), ANN_NOW);
     } else {                                    /* (0.6.2, the user) "MAXIMUM, 19 KILOHERTZ": no name, said when it
                                                  * was touched; just touched, after it */
@@ -367,19 +373,33 @@ static void sp_hush(void)
     if (!sp_on()) return;
     sp.ctx_pend = 0;
     if (ann_on()) ann_say(" ", 0, ANN_NOW);
-    if (set.voice) { vo_begin(1); vo_end(); }
+    if (set.voice) vo_hush();                   /* (0.6.4: a kept phrase, the boot's, is said whole) */
 }
 /* (0.6, the user) a knob touched, the first on this page or another than the last: its name at once ("L F O RATE";
  * a knob of few values: its value says it, with its name) */
 static int32_t sp_touch_k = -1;                 /* (the knob touched last on this page; -1: none yet) */
+#define SP_RETOUCH_MS 1000u                    /* (0.6.4, the user) no knob turned this long: the same knob is new again */
+static uint32_t sp_touch_t;                     /* (a knob turned last then) */
 static void sp_knob_touch(uint32_t k, int32_t id)
 {
+    uint32_t idle = fm1_ms - sp_touch_t >= SP_RETOUCH_MS;
+    sp_touch_t = fm1_ms;
     sp_touch_new = 0;
-    if (!sp_on() || (int32_t)k == sp_touch_k) return;
+    if (!sp_on() || ((int32_t)k == sp_touch_k && !idle)) return;
     sp_touch_k = (int32_t)k;
     sp_touch_new = 1;
-    if (sp_discrete(id)) return;               /* (its name with its first value: sp_knob_change) */
+    if (id < 0 || sp_discrete(id) || rec_down) return;   /* (its name with its first value: sp_knob_change;
+                                                 * nothing on it: sp_not_assigned, every turn; REC held, 0.6.4, the
+                                                 * user's bug: its name comes with its value, not twice) */
     sp_n = 0; sp_name(id, 0);
+    sp_send(sp_out(), ANN_NOW);
+    sp.after_page = 0;
+}
+static void sp_not_assigned(void)               /* (0.6.4, the user) a knob with nothing on it here: at every turn, so
+                                                 * it isn't turned for nothing */
+{
+    if (!sp_on()) return;
+    sp_n = 0; sp_cat("NOT ASSIGNED");
     sp_send(sp_out(), ANN_NOW);
     sp.after_page = 0;
 }
@@ -387,6 +407,70 @@ static void sp_tell(const char *s)              /* (0.6) a text said only (not o
 {
     if (!sp_on()) return;
     sp_n = 0; sp_cat(s);
+    sp_send(sp_out(), ANN_NOW);
+}
+/* (0.6.4, the user) power-on with the voice on: the firmware and its version, during the splash, kept whole (the
+ * program and the page after it wait): "F MAV ONE VERSION 0 POINT 6 POINT 4" (the user; FMAV-1's "-1" would be MINUS ONE; a
+ * build with no number in its version, the simulator's "dev": the name only) */
+static void sp_boot(void)
+{
+    const char *v = APP_VER;
+    uint32_t i, dig = 0;
+    if (!sp_on()) return;
+    for (i = 0; v[i]; i++) dig |= v[i] >= '0' && v[i] <= '9';
+    sp_n = 0; sp_cat("F MAV ONE");
+    if (dig) {
+        sp_cat(" VERSION ");
+        for (i = 0; v[i]; i++) {
+            if (v[i] == '.') sp_cat(" POINT ");
+            else { char c[2] = {v[i], 0}; sp_cat(c); }
+        }
+    }
+    {
+        const char *o = sp_out();
+#ifdef OBV_HOST
+        printf("boot said: %s\n", o);          /* (tests/run_tests.sh: the words) */
+#endif
+        sp_send(o, ANN_KEEP);
+    }
+    sp.where_soft = 1;                          /* (the user: the program and the page after it, queued, never cutting it) */
+}
+/* (0.6.4, the user) SELECT turned: the page it is on, at once, every detent (as a discrete knob's values; at the
+ * first or the last page, again), its title as a page entered says it; the patchbay's overview its cables after it */
+static void sp_select_page(void)
+{
+    if (!sp_on()) return;
+    sp.ctx = sp_ctx(); sp_reread = 0; sp_touch_k = -1;   /* (the page entered: noted, not said again by speak()) */
+    sp.ctx_pend = 0; sp.ctx_values = 0; sp.knob_pend = 0;
+    sp_n = 0; sp_title(); sp_send(sp_out(), ANN_NOW);
+    if (on_patchbay()) { sp_n = 0; sp_knobs(0); if (sp_n) sp_send(sp_out(), 0); }
+    sp.after_page = 1;
+}
+/* (0.6.4, the user) the voice just turned on (PLAY held 2 s): after "SCREEN READER ON" and a longer pause, how to use
+ * it, not the page (sp_quiet: speak() starts without it). Three SAYs (240 characters at most each), queued; "FMAV-1"
+ * said F MAV ONE (the user; its "-1" would be MINUS ONE), no "'s" (the voice would say the S alone) */
+static const char *const SP_INTRO[3] = {
+    "PRESS AND HOLD ANY PAGE NAVIGATION BUTTON TO KNOW THE PARAMETERS CORRESPONDING TO KNOBS 1, 2, 3, AND 4.",
+    "PRESS AND HOLD THE LAST BUTTON ON THE SECOND ROW TO SAY THE CURRENT PAGE, AND LISTEN TO THE ON-SCREEN VALUE OF A "
+    "PARAMETER WHILE ADJUSTING THE CORRESPONDING KNOB.",
+    "HAVE FUN WITH F MAV ONE!"};
+static uint8_t sp_quiet;                        /* (the next start says nothing: the voice just turned on) */
+static void sp_intro(void)
+{
+    uint32_t i;
+    if (!sp_on()) return;
+    if (set.voice) { vo_begin(0); vo_end(); }   /* (a stop more: ~0.45 s, the user: half of 0.9 s) */
+    for (i = 0; i < 3u; i++) { sp_n = 0; sp_cat(SP_INTRO[i]); sp_send(sp_out(), 0); }
+    sp_quiet = 1;
+}
+static void sp_rec_held(void)                   /* (0.6.4, the user) REC held: the track and the page it is on, then
+                                                 * what to do ("CURRENT TRACK 2, CURRENT PAGE 1 OF 2. OSCILLATOR. TURN A KNOB
+                                                 * TO KNOW ITS VALUE"; one track: no track) */
+{
+    if (!sp_on()) return;
+    sp_n = 0;
+    if (NTRK > 1u) { sp_cat("CURRENT TRACK "); sp_num(ctrk + 1u); sp_cat(", "); }
+    sp_cat("CURRENT PAGE "); sp_title(); sp_cat(". TURN A KNOB TO KNOW ITS VALUE");
     sp_send(sp_out(), ANN_NOW);
 }
 static void speak(void)
@@ -398,7 +482,8 @@ static void speak(void)
         sp.started = 1; sp.ctx = sp_ctx(); sp.knob_t = knob_t; sp.trk = ctrk; sp.prog = set.tprog[ctrk];
         sp.save_armed = save_armed; sp.save_to = save_to;
         sp.ctx_pend = sp.knob_pend = sp.prog_pend = sp.save_pend = sp.msg_pend = 0;
-        sp_where();
+        if (sp_quiet && !where) sp_quiet = 0;   /* (0.6.4, the user: the voice just on: its instructions, not the page) */
+        else { sp_quiet = 0; sp_where(); }
         return;
     }
     /* what changed: noted now, said once nothing turns (SP_SETTLE_MS) */
@@ -411,7 +496,7 @@ static void speak(void)
     }
     c = sp_ctx();
     if (c != sp.ctx || sp_reread || sp_values) {   /* a new page, its button again (the user: said again), or held
-                                                 * 1 s (with the values) */
+                                                 * (its knobs' names; 0.6.4: no values) */
         sp.ctx = c; sp_reread = 0; sp_touch_k = -1;   /* (a page entered: its knobs new again) */
         sp.ctx_t = now - (sp_values ? 200u : 0u); sp.ctx_pend = 1; sp.ctx_values = (uint8_t)sp_values; sp_values = 0;
         sp.knob_pend = 0; sp.knob_t = knob_t;
@@ -424,8 +509,8 @@ static void speak(void)
         if (now - sp.ctx_t < 200u) return;      /* (a button's page: flipping through settles first) */
         sp.ctx_pend = 0;
         sp_n = 0; sp_title(); sp_send(sp_out(), cut);
-        if (sp.ctx_values || on_patchbay()) {   /* (the user: a page its title; held, all its knobs with values; the
-                                                 * patchbay's overview its cables) */
+        if (sp.ctx_values || on_patchbay()) {   /* (the user: a page its title; held, all its knobs' names (0.6.4: no
+                                                 * values); the patchbay's overview its cables) */
             sp_n = 0; sp_knobs(sp.ctx_values); if (sp_n) sp_send(sp_out(), 0);
         }
         sp.after_page = 1;                      /* (what follows waits for the page, it doesn't cut it off) */

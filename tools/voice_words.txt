@@ -760,3 +760,28 @@ oscillator	AA1 S AH0 L EY2 T ER0
 # 0.6.2: HOME > READER > OUTPUT
 output	AW1 T P UH2 T
 headphones	HH EH1 D F OW2 N Z
+# 0.6.4: a knob with nothing on it
+assigned	AH0 S AY1 N D
+# 0.6.4: REC held, the page first
+current	K ER1 AH0 N T
+# 0.6.4: power-on, the version
+version	V ER1 ZH AH0 N
+# 0.6.4: the voice's instructions, when it is turned on
+adjusting	AH0 JH AH1 S T IH0 NG
+any	EH1 N IY0
+corresponding	K AO2 R AH0 S P AA1 N D IH0 NG
+fun	F AH1 N
+have	HH AE1 V
+listen	L IH1 S AH0 N
+navigation	N AE2 V AH0 G EY1 SH AH0 N
+parameter	P ER0 AE1 M AH0 T ER0
+parameters	P ER0 AE1 M AH0 T ER0 Z
+press	P R EH1 S
+row	R OW1
+say	S EY1
+while	W AY1 L
+with	W IH1 DH
+# 0.6.4: FMAV-1 said F MAV ONE (the user)
+mav	M AE1 V
+# 0.6.4: a cable LINKED TO an input (the user)
+linked	L IH1 NG K T

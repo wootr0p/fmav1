@@ -35,7 +35,7 @@ static const uint16_t VO_PITCH_HZ[VO_NPITCH] = {80, 90, 100, 110, 125, 140, 160,
 static const uint8_t VO_RATE[VO_NRATE] = {220, 190, 160, 130, 100, 80, 65, 52, 45};   /* durations, % (SPEED 1 .. 9) */
 static void vo_settings(uint32_t speed, uint32_t pitch)   /* (0.6, the user) HOME > READER's SPEED 0..8, PITCH */
 {
-    vo_pct = VO_RATE[speed < VO_NRATE ? speed : 3u];
+    vo_pct = VO_RATE[speed < VO_NRATE ? speed : 5u];
     vo_base = VO_PITCH_HZ[pitch < VO_NPITCH ? pitch : 3u];
 }
 #define VO_BARRIER() __asm__ volatile("" ::: "memory")   /* (the ring written before its end is moved) */
@@ -531,6 +531,9 @@ static void vo_begin(int now)
     vo_wl = vo_w;
     vo_wbase = vo_r;
     if (now) {
+#ifdef OBV_HOST
+        if (getenv("FMAV1_VOICE_CUTS")) printf("%6u ms  voice cut\n", fm1_ms);   /* (tests/run_tests.sh: the boot's) */
+#endif
         vo_cut_pos = vo_w;
         vo_wbase = vo_w;
         VO_BARRIER();
@@ -655,9 +658,20 @@ static void vo_text(const char *s)
     }
 }
 /* an utterance: ANN_NOW cuts off what is being said (not a warning, ANN_KEEP, still being said: then after it) */
+static int vo_keeping(void)                       /* (0.6.4) a kept phrase (ANN_KEEP: a warning, the boot's) still being
+                                                 * said: read to its end, its last segments may still sound */
+{
+    return vo_r < vo_keep_end || (vo_r == vo_keep_end && vce.sn);
+}
+static void vo_hush(void)                         /* (0.6.4) what is being said, cut off: not a kept phrase */
+{
+    if (vo_keeping()) return;
+    vo_begin(1);
+    vo_end();
+}
 static void vo_say(const char *t, uint32_t flags)
 {
-    int now = (flags & 1u) && vo_r >= vo_keep_end;
+    int now = (flags & 1u) && !vo_keeping();
     vo_begin(now);
     vo_text(t);
     vo_end();

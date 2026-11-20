@@ -17,7 +17,7 @@ printf '2100 speakdump\n2200 end\n' > $O/dump.txt
 sh tests/run_host.sh $O/dump.txt srdump > $O/dump.out
 awk -F '\t' 'NF == 2 && $1 ~ /^[A-Z]+$/' $O/dump.out | sort -u > $O/dump.tsv
 rm -f $O/said.tsv
-for f in tests/mfm_sr.txt tests/mfm_ui.txt tests/mfm_tracks.txt tests/mfm_nav.txt; do
+for f in tests/mfm_sr.txt tests/mfm_ui.txt tests/mfm_tracks.txt tests/mfm_nav.txt tests/mfm_voice.txt tests/mfm_vo_out.txt; do
     FMAV1_SAID_LOG=$PWD/$O/said.tsv build/host/fmav1 build/host/srlog $f > /dev/null || :   # (its said checks: the reader was listening already)
 done
 sort -u $O/said.tsv | cat $O/dump.tsv - > $O/all.tsv

@@ -220,6 +220,25 @@ the step says SKIPPED). `sh tests/sr_audit.sh --spoken` prints everything as it 
   the sync's tempo): `ctl_clk_ext` (USB / TRS chosen) makes arp_tick step only on the clock's grid (no clock running:
   the first note, then it waits); TEMPO locked (`knob_view_t.locked`: grey; turned: a toast), pget/param_value show the
   measured tempo ("TRS 125", "TRS ---"); a first measure after 24 clocks, then every 96 as before.
+- 0.6.4 (2026-11-20): a section's button held (`sp_values`, `ctx_values`) reads its knobs' names only
+  (`sp_knobs(held)`: no values, the user; PLAYING still after a mixer track that sounds). fmhub.json's "what": the
+  user's text, ending "Made for blind players too." A knob with nothing on it (id < 0) says "NOT ASSIGNED" at every
+  detent (`sp_not_assigned` in encoders; the user). A cable's knob (is_jack) says the whole phrase at every
+  turn (`sp_knob`, the user's exception to "the value alone"). REC held: `sp_rec_held()`, "CURRENT TRACK n, " (NTRK > 1) + "CURRENT PAGE " + sp_title()
+  + ". TURN A KNOB TO KNOW ITS VALUE" (the user). SELECT turned: `sp_select_page()` at once each detent (sp.ctx noted so
+  speak() doesn't say it again; the user: as a discrete knob's values). SPEED 6 at first (vo_speed 5, the user; saved
+  settings keep theirs: vo_set stays 2). DUMMY said DUMMY CABLE (SP_WORDS; the screen keeps DUMMY).
+  REC held (rec_down): a discrete knob says name and value every detent (sp_knob; the user). No knob turned for
+  SP_RETOUCH_MS (1 s): the same knob is new again in sp_knob_touch (its name; the user). REC held: no name
+  on the touch (the value with its name at settle; the user's bug: PITCH said twice). The voice turned on:
+  `sp_intro()` (three queued SAYs, the user's instructions; ~0.45 s of VO_STOP first), `sp_quiet`: speak()'s
+  start skips sp_where once (a WHERE asked still answers). Power-on with set.voice: `sp_boot()` before ui_splash (the audio
+  runs already), "F MAV ONE VERSION 0 POINT 6 POINT 4" with ANN_KEEP (sp_where's NOW waits); the host: FMAV1_VOICE_ON=1
+  (tests/mfm_boot.txt), APP_VER "dev" -> the name only. sp_boot sets where_soft: the program and the page queue after
+  it (the user: they cut it); vo_say and sp_hush's vo_hush keep a kept phrase until its last segments are out (vo_keeping);
+  FMAV1_VOICE_CUTS=1 prints the voice's cuts (run_tests: none at boot).
+  The patchbay (the user): the INPUTS pages' title without its "1-4" (sp_title), a cable "X LINKED TO Y" (sp_knob,
+  sp_patchbay).
 - 0.6.3 (2026-11-19): OCT- / OCT+ said again, the number first (the user: `sp_tell("+2 OCTAVE")`, sp_out: PLUS 2;
   both: say_as("OCTAVE 0", "0 OCTAVE")).
   The knobs glide (the user): `SM_IDS` (32 continuous knobs, not the times) in `track_t.sm8[NPARAM]` (Q8),

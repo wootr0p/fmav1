@@ -60,6 +60,13 @@ vo_out() {   # (0.6.2) READER > OUTPUT: MAIN the outputs and USB audio, HEADPHON
     python3 tools/voice_wav.py "$OUT/vo_out.wav" 4.3-5.5:speech 14.3-15.3:speech 18.8-25.4:quiet 25.6-26.6:speech 28.3-29.3:speech &&
     python3 tools/voice_wav.py "$OUT/vo_out-usb.wav" 4.3-5.5:speech 11.7-18.4:quiet 18.6-19.6:speech 21.3-22.3:speech 28.3-29.3:speech
 }
+boot_voice() {   # (0.6.4) power-on with the voice on: the name (and, in a release, the version) during the splash
+    APP_VER=0.6.4 FMAV1_VOICE_ON=1 FMAV1_VOICE_CUTS=1 sh tests/run_host.sh tests/mfm_boot.txt boot > "$OUT/boot.txt" 2>&1 || { grep FAIL "$OUT/boot.txt"; return 1; }
+    if grep -q "voice cut" "$OUT/boot.txt"; then echo "the boot phrase was cut:"; grep "voice cut" "$OUT/boot.txt"; return 1; fi   # (0.6.4, the user)
+    grep -q "^boot said: F MAV ONE VERSION 0 POINT 6 POINT 4\$" "$OUT/boot.txt" || { grep "boot said" "$OUT/boot.txt"; return 1; }
+    python3 tools/voice_wav.py "$OUT/boot.wav" 0.2-1.4:speech
+}
+run "power-on with the voice on: it speaks during the splash (build/host/boot.wav)" boot_voice
 run "the voice's OUTPUT: MAIN both, HEADPHONES the outputs only, USB in USB audio only (build/host/vo_out*.wav)" vo_out
 run "four tracks: channels N .. N+3, ALGORITHM, the mixer (build/host/tracks-*.png)" sh tests/run_host.sh tests/mfm_tracks.txt tracks
 run "the worst case on four tracks: everything at audio rate on each, chorus, delay and reverb" sh tests/run_host.sh tests/mfm_cpu.txt cpu4
